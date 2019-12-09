@@ -36,5 +36,5 @@ O relatório deverá descrever o protocolo e demonstrar o funcionamento de cada 
 
 ## Bibliography:
  * [Slides 5 and 6](https://joao.barraca.pt/teaching/sio/2019/)
- * Cryptography.io
+ * [Cryptography.io](https://cryptography.io)
  * [PyKCS11](https://github.com/LudovicRousseau/PyKCS11)
