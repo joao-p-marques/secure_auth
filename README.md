@@ -14,10 +14,13 @@ Start client:
  * `cd comms`
  * `python3 client.py <file_name>`
 
+## Documentation:
+
+
 ## Main objectives:
 
 ### Architecture:
-- [  ] Protocolo (planeamento e descrição) para a autenticação de utentes através de um mecanismo de desafio resposta (não é necessário considerar o registo online dos clientes)
+- [ x ] Protocolo (planeamento e descrição) para a autenticação de utentes através de um mecanismo de desafio resposta (não é necessário considerar o registo online dos clientes)
 - [  ] Mecanismo para controlo de acesso, que permita indicar explicitamente se um utente pode ou não transferir ficheiros
 - [  ] Protocolo (planeamento e descrição) para a autenticação de utentes através do cartão de cidadão
 - [  ] Protocolo (planeamento e descrição) para a autenticação do servidor utilizando certificados X.509
