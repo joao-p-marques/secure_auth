@@ -1,6 +1,8 @@
 import asyncio
 import json
 import base64
+import getpass
+import uuid
 import argparse
 import coloredlogs, logging
 import os
@@ -65,8 +67,18 @@ class ClientProtocol(asyncio.Protocol):
         logger.debug('Connected to Server')
 
         self.state = STATE_OPEN
+        self.authenticate_user()
         self.negotiate_algos()
-        
+
+    def authenticate_user(self):
+        self.username = input("User: ")
+        self.password = getpass.getpass()
+        challenge = uuid.uuid1().hex
+        message = {'type': 'AUTH_REQ', 'USERNAME':self.username, 'NONCE':challenge}
+        #self.hashed_pw = hash(self.password)
+        logger.info(message)
+        self._send(message)
+
     def negotiate_algos(self):
         #Escolha random de um dos 
         rand = random.randint(1,5)
