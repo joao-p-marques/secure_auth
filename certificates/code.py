@@ -5,6 +5,9 @@ from cryptography.hazmat.backends import default_backend
 from os import scandir
 import datetime
 
+roots = {}
+intermediate_certs = {}
+
 def load_certificate(file_name): 
     now = datetime.datetime.now()
 
@@ -12,13 +15,16 @@ def load_certificate(file_name):
         pem_data = f.read()
         cert = x509.load_pem_x509_certificate(pem_data, default_backend())
 
-    print(f"Loaded {cert.serial_number}")
-    print(f"Valid from {cert.not_valid_before} to {cert.not_valid_after}", end="")
+    # print(f"Loaded {cert.serial_number}")
+    # print(f"Valid from {cert.not_valid_before} to {cert.not_valid_after}", end="")
 
     if cert.not_valid_after > now:
-        print(" EXPIRED", end="")
+        # print(" EXPIRED", end="")
+        return
+    else:
+        return cert
 
-    print()
+    # print()
 
 def build_issuers(chain, cert):
     chain.append(cert)
@@ -42,5 +48,13 @@ for entry in scandir('/etc/ssl/certs'):
     # print(entry.name)
     if entry.is_dir():
         continue
-    if not 'trust' in entry.name:# and 'crt' in entry.name:
-        load_certificate(entry)
+    c = load_certificate(entry)
+    if c is None:
+        continue
+    if 'trust' in entry.name: # and 'crt' in entry.name:
+        roots[c.issuer.rfc4514_string()] = c
+    else:
+        intermediate_certs[c.issuer.rfc4514_string()] = c
+
+print(roots)
+print(intermediate_certs)
