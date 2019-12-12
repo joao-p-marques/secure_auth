@@ -77,12 +77,46 @@ class ClientProtocol(asyncio.Protocol):
         message = {'type': 'HELLO'}
         self._send(message)
 
+    def validate_cert(self,message):
+        #validate chain here
+        if True:
+            logger.info("Deu")
+            msg = self.decide_cert_pass()
+            self._send(msg)
+            return True
+        else:
+            logger.info("Nao validei")
+            return False
+
+    def decide_cert_pass(self):
+        opt = input("\nQual metodo pretende usar? \n(1) - CC\n(2) - Senha\n>> ")
+        while(opt != "1" and opt!="2"):
+            opt = input("\nQual metodo pretende usar? \n(1) - CC\n(2) - Senha\n>> ")
+
+        if opt == "1":
+            logger.info("Going for CC")
+            msg = self.authenticate_cc()
+        elif opt == "2":
+            logger.info("Going for senha")
+            msg = self.authenticate_user()
+        
+        return msg
+
     def authenticate_user(self):
         self.username = input("User: ")
         self.password = getpass.getpass()
         challenge = uuid.uuid1().hex
-        message = {'type': 'HELLO', 'USERNAME':self.username, 'NONCE':challenge}
+        message = {'type': 'CHALLENGE', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE':challenge}
         #self.hashed_pw = hash(self.password)
+        logger.info(message)
+        self._send(message)
+
+    def authenticate_cc(self):
+        #o username vai ser o codigo do cc, tem que estar na bd
+        #joao pega aqui
+        #talvez fazermos mais um campo na bd que assume
+        challenge = uuid.uuid1().hex
+        message = {'type': 'CHALLENGE', 'login_type':'CC', 'USERNAME':'BuscarNumeroNoCC', 'NONCE':challenge}
         logger.info(message)
         self._send(message)
 
@@ -185,6 +219,10 @@ class ClientProtocol(asyncio.Protocol):
             self.diffie_hellman_gen_Y(p, g)
             logger.info("Sent Key")
             return
+        elif mtype == 'CERT':
+            ret = self.validate_cert(message)
+            return True if ret else self.transport.close()
+
         elif mtype == 'DH_KEY_EXCHANGE':
             pub_key = message.get('data').get('pub_key')
             self.get_key(pub_key)

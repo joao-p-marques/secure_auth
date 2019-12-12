@@ -7,10 +7,11 @@ import re
 import os
 from aio_tcpserver import tcp_server
 
+from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, PublicFormat, load_pem_public_key
-from cryptography.hazmat.primitives.asymmetric import dh
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, PublicFormat, load_pem_public_key,load_pem_private_key
+from cryptography.hazmat.primitives.asymmetric import dh,rsa
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
@@ -46,6 +47,12 @@ class ClientHandler(asyncio.Protocol):
 
         self.parameters = None
         self.private_key = None
+
+        #Starting publ and priv keys for session
+        with open('server/ServerPrat_Key.pem','rb') as f:
+            pem_data = f.read()
+        self.priv_key = load_pem_private_key(pem_data, password=None, backend=default_backend())
+        self.publ_key = self.priv_key.public_key()
 
         #Arrays of possible ciphers to take from
         self.ciphers = ['AES','3DES','ChaCha20']
@@ -167,6 +174,8 @@ class ClientHandler(asyncio.Protocol):
                 self.diffie_hellman_gen_Y()
         elif mtype == 'HELLO':
             ret = self.process_hello()
+        elif mtype == 'CHALLENGE':
+            ret = self.process_challenge(message)
 
         elif mtype == 'AUTH_REQ':
             ret = self.process_authenticate(message)
@@ -281,12 +290,32 @@ class ClientHandler(asyncio.Protocol):
             return True
         return False
 
-    def process_authenticate(self, message: str) -> bool:
-        logger.debug("Process Authentication: {}".format(message)
-        messg = {'value':'v'}
-        self._send(messg)
+    def process_hello(self) -> bool:
+        logger.info("Sending Certificate")
+        with open('server/ServerPrat.crt','rb') as f:
+            pem_data = f.read()
+        cert = x509.load_pem_x509_certificate(pem_data, default_backend())
+        cert = cert.public_bytes(Encoding.PEM)
+        self.certificate = str(cert)
+        msg = {
+            'type' : 'CERT',
+            'cert' : self.certificate
+            }
+        self._send(msg)
         return True
 
+    def process_challenge(self,message) -> bool:
+        if message.get('login_type', "").upper() == "CC":
+            pass
+            #get the keys from the CC and sign it
+        else:
+            #use own pair of keys
+            self.priv_key = 1
+            self.publ_key = 1
+            
+        
+        self._send(msg)
+        return True
 
     def process_close(self, message: str) -> bool:
         """
@@ -306,7 +335,6 @@ class ClientHandler(asyncio.Protocol):
         self.state = STATE_CLOSE
 
         return True
-
 
     def _send(self, message: str, dump=True) -> None:
         """
