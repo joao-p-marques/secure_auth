@@ -1,6 +1,6 @@
 # Secure Comms with Authentication
 
-O projeto consiste no desenho e implementação de um protocolo que permita a comunicação segura entre dois pontos, com autenticação mútua. 
+O projeto consiste no desenho e implementação de um protocolo que permita a comunicação segura entre dois pontos, com autenticação mútua.
 Pretende-se que seja possı́vel trocar um ficheiro entre o cliente e o servidor usando o protocolo, caso o servidor considere que o utilizador tem essas permissões.
 O utente pode-se autenticar com senhas diretas ou com o cartão de cidadão.
 O servidor deverá conseguir provar a sua identidade, evintando-se ataques de MiTM ou impersonação

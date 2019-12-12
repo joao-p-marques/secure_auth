@@ -186,7 +186,6 @@ class ClientHandler(asyncio.Protocol):
             self.state = STATE_CLOSE
             self.transport.close()
 
-
     def process_open(self, message: str) -> bool:
         """
         Processes an OPEN message from the client
@@ -228,7 +227,6 @@ class ClientHandler(asyncio.Protocol):
         self.file_path = file_path
         self.state = STATE_OPEN
         return True
-
 
     def process_data(self, message: str) -> bool:
         """
