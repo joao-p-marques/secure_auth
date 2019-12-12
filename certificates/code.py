@@ -1,6 +1,7 @@
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import padding
 
 from os import scandir
 import datetime
@@ -30,25 +31,37 @@ def load_certificate(file_name):
 
     # return cert, True
 
-def build_issuers(chain, cert, depth=0):
-    if depth > 10:
-        return
-
+def build_chain(chain, cert):
     chain.append(cert)
-    print(chain)
 
     issuer = cert.issuer.rfc4514_string()
     subject = cert.subject.rfc4514_string()
 
     if issuer == subject and subject in roots:
         print("Chain completed")
-        return True
+        return chain
 
     if issuer in roots:
-        return build_issuers(chain, roots[issuer], depth+1)
+        return build_chain(chain, roots[issuer])
     elif issuer in intermediate_certs:
         print('found issuer')
-        return build_issuers(chain, intermediate_certs[issuer], depth+1)
+        return build_chain(chain, intermediate_certs[issuer])
+
+def validate_chain(chain):
+    if len(chain) == 1:
+        return True
+
+    cert = chain[0]
+    issuer = chain[1]
+
+    issuer.public_key().verify(
+        cert.signature,
+        cert.tbs_certificate_bytes,
+        padding.PKCS1v15(),
+        cert.signature_hash_algorithm,
+    )
+
+    return validate_chain(chain[1:])
 
 def load_certificates(dir_name, roots, intermediate_certs):
     for entry in scandir(dir_name):
@@ -67,6 +80,10 @@ def load_certificates(dir_name, roots, intermediate_certs):
 load_certificates('/etc/ssl/certs', roots, intermediate_certs)
 load_certificates('certs/', roots, intermediate_certs)
 
-c, valid = load_certificate('certs/cc_cert.pem')
+c, valid = load_certificate('certs/gitlab.pem')
 
-build_issuers([], c)
+cert_chain = build_chain([], c)
+print(cert_chain)
+
+chain_valid = validate_chain(cert_chain)
+print(chain_valid)
