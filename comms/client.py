@@ -70,14 +70,18 @@ class ClientProtocol(asyncio.Protocol):
         logger.debug('Connected to Server')
 
         self.state = STATE_OPEN
-        self.authenticate_user()
+        self.start_connection()
         self.negotiate_algos()
+
+    def start_connection(self):
+        message = {'type': 'HELLO'}
+        self._send(message)
 
     def authenticate_user(self):
         self.username = input("User: ")
         self.password = getpass.getpass()
         challenge = uuid.uuid1().hex
-        message = {'type': 'AUTH_REQ', 'USERNAME':self.username, 'NONCE':challenge}
+        message = {'type': 'HELLO', 'USERNAME':self.username, 'NONCE':challenge}
         #self.hashed_pw = hash(self.password)
         logger.info(message)
         self._send(message)

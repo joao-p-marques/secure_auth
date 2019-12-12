@@ -165,7 +165,9 @@ class ClientHandler(asyncio.Protocol):
                 self.diffie_hellman_init()
             if not self.private_key:
                 self.diffie_hellman_gen_Y()
-        
+        elif mtype == 'HELLO':
+            ret = self.process_hello()
+
         elif mtype == 'AUTH_REQ':
             ret = self.process_authenticate(message)
         
@@ -278,6 +280,12 @@ class ClientHandler(asyncio.Protocol):
             logger.info("User %s can write files" % (message['USERNAME']))
             return True
         return False
+
+    def process_authenticate(self, message: str) -> bool:
+        logger.debug("Process Authentication: {}".format(message)
+        messg = {'value':'v'}
+        self._send(messg)
+        return True
 
 
     def process_close(self, message: str) -> bool:
