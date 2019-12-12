@@ -13,9 +13,13 @@ def load_certificate(file_name):
 
     with open(file_name, 'rb') as f:
         pem_data = f.read()
+        # if '.cer' in file_name.name:
+        #     cert = x509.load_der_x509_certificate(pem_data, default_backend())
+        # else:
+            # cert = x509.load_pem_x509_certificate(pem_data, default_backend())
         cert = x509.load_pem_x509_certificate(pem_data, default_backend())
 
-    # print(f"Loaded {cert.serial_number}")
+    # print(f"Loaded {cert.subject} {cert.serial_number}")
     # print(f"Valid from {cert.not_valid_before} to {cert.not_valid_after}")
 
     if cert.not_valid_after < now:
@@ -48,7 +52,7 @@ def build_issuers(chain, cert, depth=0):
 
 def load_certificates(dir_name, roots, intermediate_certs):
     for entry in scandir(dir_name):
-        if entry.is_dir() or not ('pem' in entry.name or 'crt' in entry.name):
+        if entry.is_dir() or not (any(x in entry.name for x in ['crt', 'pem', 'cer'])):
             continue
         c, valid = load_certificate(entry)
         if not valid:
@@ -63,6 +67,8 @@ def load_certificates(dir_name, roots, intermediate_certs):
 load_certificates('/etc/ssl/certs', roots, intermediate_certs)
 load_certificates('certs/', roots, intermediate_certs)
 
-c, valid = load_certificate('certs/gitlab.pem')
+c, valid = load_certificate('certs/cc_cert.pem')
+
+print(c.issuer)
 
 build_issuers([], c)
