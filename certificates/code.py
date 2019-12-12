@@ -52,7 +52,7 @@ def build_issuers(chain, cert, depth=0):
 
 def load_certificates(dir_name, roots, intermediate_certs):
     for entry in scandir(dir_name):
-        if entry.is_dir() or not (any(x in entry.name for x in ['crt', 'pem', 'cer'])):
+        if entry.is_dir() or not (any(x in entry.name for x in ['pem', 'cer'])):
             continue
         c, valid = load_certificate(entry)
         if not valid:
@@ -68,7 +68,5 @@ load_certificates('/etc/ssl/certs', roots, intermediate_certs)
 load_certificates('certs/', roots, intermediate_certs)
 
 c, valid = load_certificate('certs/cc_cert.pem')
-
-print(c.issuer)
 
 build_issuers([], c)
