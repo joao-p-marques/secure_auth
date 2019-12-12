@@ -61,8 +61,8 @@ def load_certificates(dir_name, roots, intermediate_certs):
 
 
 load_certificates('/etc/ssl/certs', roots, intermediate_certs)
-load_certificates('.', roots, intermediate_certs)
+load_certificates('certs/', roots, intermediate_certs)
 
-c, valid = load_certificate('gitlab.pem')
+c, valid = load_certificate('certs/gitlab.pem')
 
 build_issuers([], c)
