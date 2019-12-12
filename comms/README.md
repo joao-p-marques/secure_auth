@@ -23,7 +23,7 @@ O servidor deverá conseguir provar a sua identidade, evintando-se ataques de Mi
 - [  ] Outros mecanismos que confiram maior segurança ao sistema (Opcional)
 
 ## Report:
-O relatório deverá descrever o protocolo e demonstrar o funcionamento de cada uma das 4 funcionalidade + capturas de ecrã
+O relatório deverá descrever o protocolo e demonstrar o funcionamento de cada uma das 4 funcionalidade + capturas de ecrã  
 
 ## Bibliography:
  * [Slides 5 and 6](https://joao.barraca.pt/teaching/sio/2019/)
