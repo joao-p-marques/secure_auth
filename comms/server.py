@@ -325,6 +325,11 @@ class ClientHandler(asyncio.Protocol):
     def create_challenge(self):
         return uuid.uuid4().hex
 
+    def hash_pw(self,pw):
+        h = hashes.Hash(hashes.SHA512(), backend=default_backend())
+        h.update(pw.encode())
+        return h.finalize()
+
     def process_login(self, message) -> bool:
         # we check which type of login it is
         type_login = message.get('login_type', "")
@@ -353,7 +358,11 @@ class ClientHandler(asyncio.Protocol):
                 return False
             else:
                 #verificar se a pass esta bem aqui
+                h = hmac.HMAC(self.hash_pw(self.user_data[username][1]), hashes.SHA256(), backend=default_backend())
+                h.update(message.encode())
+                signature = h.finalize()
 
+                #estamos a fazer a verificaçao aqui
                 if signature != message.get('ANSWER',''):
                     self._send({'type': 'ERROR', 'message': 'Authentication Failed'})
                     return False
