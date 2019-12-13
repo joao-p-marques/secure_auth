@@ -145,11 +145,11 @@ class ClientHandler(asyncio.Protocol):
             return
 
         mtype = message.get('type', "").upper()
+        logger.info(message)
 
         if mtype == 'MIC':
             mic = base64.b64decode(message.get('mic'))
             msg = message.get('msg')
-
             if self.hash_mic(json.dumps(msg).encode()) == mic:
                 # logger.debug('MIC Accepted')
                 message = msg
@@ -167,7 +167,7 @@ class ClientHandler(asyncio.Protocol):
             message = json.loads(message.decode())
             mtype = message.get('type', None)
 
-        logger.debug(f"Received (decrypted): {message}")
+        logger.info(f"Received (decrypted): {message}")
 
         if mtype == 'DH_KEY_EXCHANGE':
             ret = self.get_key(message.get('data').get('pub_key'))
@@ -311,14 +311,14 @@ class ClientHandler(asyncio.Protocol):
         msg = ''
         if message.get('login_type', "").upper() == "CC":
             if self.check_user(username,True):
-                msg = self.solve_challenge()
+                msg = self.solve_challenge('')
             else:
                 return False
             #get the keys from the CC and sign it
         else: #recebeu senha e ent vai assinar com sua priv
             #validou que é um user relevante, Access control
             if self.check_user(username,False):
-                msg = self.solve_challenge()
+                msg = self.solve_challenge('')
             else:
                 return False
         
@@ -329,16 +329,17 @@ class ClientHandler(asyncio.Protocol):
         return True
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
-        signature = self.priv_key.sign(
-            message,
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
-            hash_using
-        )
-        logger.info("Signing with private: %s" % (signature))
-        return signature
+        # signature = self.priv_key.sign(
+        #     message,
+        #     padding.PSS(
+        #         mgf=padding.MGF1(hashes.SHA256()),
+        #         salt_length=padding.PSS.MAX_LENGTH
+        #     ),
+        #     hash_using
+        # )
+        # logger.info("Signing with private: %s" % (signature))
+        # return signature
+        return ""
 
     def solve_challenge(self,challenge):
         #recebe aqui o challenge encriptado e resolve o, return de uma mensagem

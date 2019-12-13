@@ -75,7 +75,6 @@ class ClientProtocol(asyncio.Protocol):
         logger.debug('Connected to Server')
 
         self.state = STATE_OPEN
-        self.start_connection()
         self.negotiate_algos()
 
     def start_connection(self):
@@ -120,6 +119,7 @@ class ClientProtocol(asyncio.Protocol):
         logger.info(message)
         self._send(message)
 
+
     def authenticate_cc(self):
         #o username vai ser o codigo do cc, tem que estar na bd
         #joao pega aqui
@@ -134,16 +134,17 @@ class ClientProtocol(asyncio.Protocol):
         self._send(message)
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
-        signature = self.priv_key.sign(
-            message,
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
-            hash_using
-        )
-        logger.info("Signing with private: %s" % (signature))
-        return signature.public_bytes(Encoding.PEM)
+        # signature = self.priv_key.sign(
+        #     message,
+        #     padding.PSS(
+        #         mgf=padding.MGF1(hashes.SHA256()),
+        #         salt_length=padding.PSS.MAX_LENGTH
+        #     ),
+        #     hash_using
+        # )
+        # logger.info("Signing with private: %s" % (signature))
+        # return signature.public_bytes(Encoding.PEM)
+        return ''
 
     def negotiate_algos(self):
         #Escolha random de um dos 
@@ -214,6 +215,7 @@ class ClientProtocol(asyncio.Protocol):
             return
 
         mtype = message.get('type', None)
+        logger.info(message)
 
         if mtype == 'MIC':
             mic = base64.b64decode(message.get('mic'))
@@ -265,6 +267,8 @@ class ClientProtocol(asyncio.Protocol):
             return
         elif mtype == 'CIPHER_CHOSEN':
             self.finalize_algorithm(message)
+            #Processo de escolha foi feito e agora vamos transferir o file
+            self.start_connection()
             self.open_connection()
             return
         elif mtype == 'ERROR':
