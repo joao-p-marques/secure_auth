@@ -9,17 +9,20 @@ import datetime
 
 class Certificate_Validator():
 
-    def __init__(self, trusted_cert_list, cert_list, crl_list):
+    def __init__(self, trusted_cert_list, cert_list, crls_path):
         self.roots = {}
         self.intermediate_certs = {}
         self.crls = []
+
+        self.crls_path = crls_path
 
         for d in trusted_cert_list:
             self.load_certificates(d, trusted=True)
         for d in cert_list:
             self.load_certificates(d)
-        for d in crl_list:
-            self.load_crls(d)
+        # for d in crl_list:
+        #     self.load_crls(d)
+        #     print(f'Loaded {d}')
 
     def load_certificate(self, file_name): 
         now = datetime.datetime.now()
@@ -104,7 +107,26 @@ class Certificate_Validator():
             crl = self.load_crl(entry)
             self.crls.append(crl)
 
+    def load_crls_cert(self, cert):
+        try:
+            for ext in cert.extensions.get_extension_for_class(x509.CRLDistributionPoints).value:
+                for name in ext.full_name:
+                    fname = wget.download(name.value, self.crls_path + name + '.crl')
+                    print(fname)
+        except:
+            print('No CRLs found')
+
+        try:
+            for ext in cert.extensions.get_extension_for_class(x509.FreshestCRL).value:
+                for name in ext.full_name:
+                    fname = wget.download(name.value, self.crls_path + name + '.crl')
+                    print(fname)
+        except:
+            print('No Delta CRLs found.')
+
+
     def validate_certificate(self, cert):
+        self.load_crls_cert(cert)
         chain = self.build_chain([], cert)
         is_valid = self.validate_chain(chain)
 
