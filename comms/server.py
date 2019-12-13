@@ -64,8 +64,7 @@ class ClientHandler(asyncio.Protocol):
             pem_data = f.read()
         f.close()
         cert = x509.load_pem_x509_certificate(pem_data, default_backend())
-        cert = cert.public_bytes(Encoding.PEM)
-        self.certificate = str(cert)
+        self.certificate = cert
 
         #Starting publ and priv keys for session
         with open('server/ServerPrat_Key.pem','rb') as f:
@@ -84,7 +83,7 @@ class ClientHandler(asyncio.Protocol):
         self.mode = None
         self.hash_function = None
 
-        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/PTEID/'], ['certs/crls'])
+        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/server/PTEID/'], ['certs/crls'])
 
     def connection_made(self, transport) -> None:
         """
@@ -305,7 +304,7 @@ class ClientHandler(asyncio.Protocol):
         logger.info("Sending Certificate")
         msg = {
             'type' : 'CERT',
-            'cert' : self.certificate
+            'cert' : base64.b64encode(self.certificate.public_bytes(Encoding.PEM)).decode()
             }
         self._send(msg)
         return True
@@ -316,7 +315,7 @@ class ClientHandler(asyncio.Protocol):
         msg = ''
         if message.get('login_type', "").upper() == "CC":
             # validar certificado do user
-            if not self.validator.validate_cert(message.get('USER_CERT')):
+            if not self.validator.validate_certificate(message.get('USER_CERT')):
                 return False
 
             if self.check_user(username, True):

@@ -14,43 +14,49 @@ class CC_authenticator():
         self.pkcs11 = PyKCS11.PyKCS11Lib()
         self.pkcs11.load(lib)
 
-        self.slots = pkcs11.getSlotList()
+        self.slots = self.pkcs11.getSlotList()
 
-        # for slot in slots:
-        #     print(pkcs11.getTokenInfo(slot))
+        for slot in self.slots:
+            print(self.pkcs11.getTokenInfo(slot))
 
         self.all_attr = list(PyKCS11.CKA.keys())
 
         #Filter attributes
-        self.all_attr = [e for e in all_attr if isinstance(e, int)]
-        self.session = pkcs11.openSession(slot)
+        self.all_attr = [e for e in self.all_attr if isinstance(e, int)]
+        self.session = self.pkcs11.openSession(slot)
 
-        self.private_key = None
-        self.get_pk()
+        self._private_key = None
+        self.fetch_pk()
+
+        self.attr = None
+        self.get_attr_list()
 
         self.cert = None
 
     def get_attr_list(self):
         for obj in self.session.findObjects():
             # Get object attributes
-            attr = self.session.getAttributeValue(obj, self.all_attr)
+            self.attr = self.session.getAttributeValue(obj, self.all_attr)
 
             # Create dictionary with attributes
-            attr = dict(zip(map(PyKCS11.CKA.get, self.all_attr), attr))
+            self.attr = dict(zip(map(PyKCS11.CKA.get, self.all_attr), self.attr))
 
-            print('Label:', attr['CKA_LABEL'])
+            print('Label:', self.attr['CKA_LABEL'])
 
-    def get_pk(self):
-        self.private_key = session.findObjects([
+    def fetch_pk(self):
+        self._private_key = self.session.findObjects([
                 (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
                 (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION KEY')]
             )[0]
+
+    def private_key(self):
+        return self._private_key
 
     def sign_text(self, text):
         mechanism = PyKCS11.Mechanism(PyKCS11.CKM_SHA1_RSA_PKCS, None)
         # text = b'text to sign'
 
-        signature = bytes(session.sign(private_key, text, mechanism))
+        signature = bytes(session.sign(self._private_key, text, mechanism))
         # print(signature)
         return signature
 
@@ -60,9 +66,10 @@ class CC_authenticator():
         #             (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION CERTIFICATE')]
         #             )[0]
         if not self.cert:
-            self.cert = x509.load_der_x509_certificate(bytes(attr['CKA_VALUE']), default_backend())
-        return self.cert.public_bytes(
-            encoding=serialization.Encoding.PEM
-        )
+            self.cert = x509.load_der_x509_certificate(bytes(self.attr['CKA_VALUE']), default_backend())
+        return self.cert
+        # return self.cert.public_bytes(
+        #     encoding=serialization.Encoding.PEM
+        # )
 
 

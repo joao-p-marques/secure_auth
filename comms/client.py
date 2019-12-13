@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, ParameterForm
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from cc_authenticator import *
+from certificate_validator import *
 
 logger = logging.getLogger('root')
 
@@ -67,7 +68,7 @@ class ClientProtocol(asyncio.Protocol):
 
         self.cc_authenticator = None
 
-        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/PTEID/'], ['certs/crls'])
+        self.validator = Certificate_Validator(['/etc/ssl/certs/', 'certs/client/server_certs'], [], ['certs/crls'])
 
     def connection_made(self, transport) -> None:
         """
@@ -88,9 +89,13 @@ class ClientProtocol(asyncio.Protocol):
         message = {'type': 'HELLO'}
         self._send(message)
 
-    def validate_cert(self,message):
+    def validate_cert(self, pem_data):
         #validate chain here
-        if True:
+        # print(pem_data)
+        self.server_cert = x509.load_pem_x509_certificate(pem_data, default_backend())
+        print(self.server_cert.issuer)
+        valid = self.validator.validate_certificate(self.server_cert)
+        if valid:
             msg = self.decide_cert_pass()
             self._send(msg)
             return True
@@ -137,10 +142,16 @@ class ClientProtocol(asyncio.Protocol):
         #talvez fazermos mais um campo na bd que assume
         challenge = uuid.uuid1().hex
         #fazer algo semalhante para ter as chaves do CC
-        self.priv_key = 'cenas'
-        self.publ_key = self.priv_key.public_key()
+        self.priv_key = self.cc_authenticator.private_key()
+        self.publ_key = cc_cert.public_key()
 
-        message = {'type': 'LOGIN', 'login_type':'CC', 'USERNAME': self.username, 'USER_CERT': cc_cert, 'NONCE':challenge}
+        message = {
+                'type': 'LOGIN', 
+                'login_type':'CC', 
+                'USERNAME': cc_cert.subject.rfc4514_string(), 
+                'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(), 
+                'NONCE':challenge
+                }
         logger.info(message)
         self._send(message)
 
@@ -258,7 +269,7 @@ class ClientProtocol(asyncio.Protocol):
             logger.info("Sent Key")
             return
         elif mtype == 'CERT':
-            ret = self.validate_cert(message)
+            ret = self.validate_cert(base64.b64decode(message.get('cert')))
             return True if ret else self.transport.close()
 
         elif mtype == 'DH_KEY_EXCHANGE':

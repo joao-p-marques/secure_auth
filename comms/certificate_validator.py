@@ -14,9 +14,8 @@ class Certificate_Validator():
         self.intermediate_certs = {}
         self.crls = []
 
-        print('ole')
         for d in trusted_cert_list:
-            self.load_certificates(d, True)
+            self.load_certificates(d, trusted=True)
             print(f'Loaded {d}')
         for d in cert_list:
             self.load_certificates(d)
@@ -63,10 +62,10 @@ class Certificate_Validator():
             return chain
 
         if issuer in self.roots:
-            return build_chain(chain, self.roots[issuer])
+            return self.build_chain(chain, self.roots[issuer])
         elif issuer in self.intermediate_certs:
             print('found issuer')
-            return build_chain(chain, self.intermediate_certs[issuer])
+            return self.build_chain(chain, self.intermediate_certs[issuer])
 
     def validate_chain(self, chain):
         if len(chain) == 1:
@@ -89,16 +88,17 @@ class Certificate_Validator():
             if crl.get_revoked_certificate_by_serial_number(cert.serial_number) is not None:
                 return False
 
-        return self.validate_chain(chain[1:], self.crls)
+        return self.validate_chain(chain[1:])
 
     def load_certificates(self, dir_name, trusted=False):
         for entry in scandir(dir_name):
-            if entry.is_dir() or not (any(x in entry.name for x in ['pem', 'cer'])):
+            if entry.is_dir() or not (any(x in entry.name for x in ['pem', 'cer', 'crt'])):
                 continue
             c, valid = self.load_certificate(entry)
             if not valid:
+                print(c, 'not valid')
                 continue
-            # print('Loading', entry.name, '(', c.subject.rfc4514_string(), ')')
+            print('Loaded', entry.name, '(', c.subject.rfc4514_string(), ')')
             if trusted:
                 self.roots[c.subject.rfc4514_string()] = c
             else:
@@ -113,6 +113,7 @@ class Certificate_Validator():
 
     def validate_certificate(self, cert):
         chain = self.build_chain([], cert)
+        print(chain)
         is_valid = self.validate_chain(chain)
 
         return is_valid
