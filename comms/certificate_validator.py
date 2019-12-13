@@ -9,26 +9,32 @@ import datetime
 
 class Certificate_Validator():
 
-    def __init__(self):
+    def __init__(self, trusted_cert_list, cert_list, crl_list):
         self.roots = {}
         self.intermediate_certs = {}
         self.crls = []
 
-        self.load_certificates('/etc/ssl/certs')
-        self.load_certificates('certs/')
-        self.load_certificates('certs/PTEID/')
-        self.load_crls('certs/crls')
+        print('ole')
+        for d in trusted_cert_list:
+            self.load_certificates(d, True)
+            print(f'Loaded {d}')
+        for d in cert_list:
+            self.load_certificates(d)
+            print(f'Loaded {d}')
+        for d in crl_list:
+            self.load_crls(d)
+            print(f'Loaded {d}')
 
     def load_certificate(self, file_name): 
         now = datetime.datetime.now()
 
         with open(file_name, 'rb') as f:
             pem_data = f.read()
-            # if '.cer' in file_name.name:
-            #     cert = x509.load_der_x509_certificate(pem_data, default_backend())
-            # else:
-                # cert = x509.load_pem_x509_certificate(pem_data, default_backend())
-            cert = x509.load_pem_x509_certificate(pem_data, default_backend())
+            if '.cer' in file_name.name:
+                cert = x509.load_der_x509_certificate(pem_data, default_backend())
+            else:
+                cert = x509.load_pem_x509_certificate(pem_data, default_backend())
+            # cert = x509.load_pem_x509_certificate(pem_data, default_backend())
 
         # print(f"Loaded {cert.subject} {cert.serial_number}")
         # print(f"Valid from {cert.not_valid_before} to {cert.not_valid_after}")
@@ -85,15 +91,15 @@ class Certificate_Validator():
 
         return self.validate_chain(chain[1:], self.crls)
 
-    def load_certificates(self, dir_name):
+    def load_certificates(self, dir_name, trusted=False):
         for entry in scandir(dir_name):
             if entry.is_dir() or not (any(x in entry.name for x in ['pem', 'cer'])):
                 continue
-            c, valid = load_certificate(entry)
+            c, valid = self.load_certificate(entry)
             if not valid:
                 continue
             # print('Loading', entry.name, '(', c.subject.rfc4514_string(), ')')
-            if any(x in entry.name for x in ['Root', 'ROOT', 'Trust', 'TRUST']): # and 'crt' in entry.name:
+            if trusted:
                 self.roots[c.subject.rfc4514_string()] = c
             else:
                 self.intermediate_certs[c.subject.rfc4514_string()] = c
@@ -102,7 +108,7 @@ class Certificate_Validator():
         for entry in scandir(dir_name):
             if entry.is_dir() or not (any(x in entry.name for x in ['crl'])):
                 continue
-            crl = load_crl(entry)
+            crl = self.load_crl(entry)
             self.crls.append(crl)
 
     def validate_certificate(self, cert):

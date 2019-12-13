@@ -67,6 +67,7 @@ class ClientProtocol(asyncio.Protocol):
 
         self.cc_authenticator = None
 
+        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/PTEID/'], ['certs/crls'])
 
     def connection_made(self, transport) -> None:
         """
