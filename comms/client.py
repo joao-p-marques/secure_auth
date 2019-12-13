@@ -81,12 +81,11 @@ class ClientProtocol(asyncio.Protocol):
 
         self.state = STATE_OPEN
         self.start_connection()
-        # self.negotiate_algos()
+        self.negotiate_algos()
 
     def start_connection(self):
         message = {'type': 'HELLO'}
         self._send(message)
-        return
 
     def validate_cert(self,message):
         #validate chain here

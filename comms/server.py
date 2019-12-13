@@ -44,10 +44,10 @@ class ClientHandler(asyncio.Protocol):
 
         self.key = None
 
+        file = None
         #Auth
         with open('userdb','rb') as f:
             file = f.read().decode()
-        f.close()
         lines = re.split('\n',file)
         self.elems = [re.split(':',line) for line in lines]
         self.users = [elem[0] for elem in self.elems]
@@ -55,14 +55,7 @@ class ClientHandler(asyncio.Protocol):
         self.user_data = {}
         for elem in self.elems:
             self.user_data[elem[0]] = elem[1:]
-
-        self.user_keys = {}
-        with open('user_keys', 'rb') as f:
-            username = f.readline().decode
-            key =  f.readline()
-            self.user_keys[username] = key
-
-        print(self.user_keys)
+        print('olaaaaaaa')
 
         self.parameters = None
         self.private_key = None

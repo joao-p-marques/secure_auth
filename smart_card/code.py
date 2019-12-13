@@ -56,4 +56,6 @@ print(cert.public_bytes(
 with open('cc_cert.pem', 'wb') as f:
     f.write(cert.public_bytes(encoding=serialization.Encoding.PEM))
 
+print()
+print(cert.public_key().public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo))
 
