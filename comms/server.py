@@ -1,6 +1,7 @@
 import asyncio
 import json
 import base64
+import uuid
 import argparse
 import coloredlogs, logging
 import re
@@ -186,6 +187,8 @@ class ClientHandler(asyncio.Protocol):
             ret = ret and self.diffie_hellman_gen_Y()
         elif mtype == 'CLOSE':
             ret = self.process_close(message)
+        elif mtype == 'CHALLENGE':
+            ret = self.process_challenge(message)
         elif mtype == 'NEGOTIATE':
             ret = self.process_negotiate(message)
             if not self.parameters:
@@ -307,6 +310,18 @@ class ClientHandler(asyncio.Protocol):
         self._send(msg)
         return True
 
+    def process_challenge(self,message):
+        gotten_challenge = message.get('NONCE','')
+        self.challenge = self.create_challenge()
+        #logger.info("Gotten challenge: %s " % (gotten_challenge))
+        #Aqui vamos enviar a resposta ao challenge + um proprio desafio
+        msg = { 'type':'CHALLENGE_ANSWER', 'ANSWER':base64.b64encode(self.sign_private(gotten_challenge)).decode(), 'NONCE':self.challenge }
+        self._send(msg)
+        return True
+
+    def create_challenge(self):
+        return uuid.uuid4().hex
+
     def process_login(self, message) -> bool:
         username = message.get('USERNAME', "")
         #check if login type is of CC
@@ -322,6 +337,7 @@ class ClientHandler(asyncio.Protocol):
             if self.check_user(username, True):
                 msg = self.solve_challenge('')
             else:
+                self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
                 return False
             # get the keys from the CC and sign it
         else: #recebeu senha e ent vai assinar com sua priv
@@ -329,6 +345,7 @@ class ClientHandler(asyncio.Protocol):
             if self.check_user(username,False):
                 msg = self.solve_challenge('')
             else:
+                self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
                 return False
         
         #signature = self.sign_private()
@@ -338,17 +355,16 @@ class ClientHandler(asyncio.Protocol):
         return True
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
-        # signature = self.priv_key.sign(
-        #     message,
-        #     padding.PSS(
-        #         mgf=padding.MGF1(hashes.SHA256()),
-        #         salt_length=padding.PSS.MAX_LENGTH
-        #     ),
-        #     hash_using
-        # )
-        # logger.info("Signing with private: %s" % (signature))
-        # return signature
-        return ""
+        signature = self.priv_key.sign(
+            message.encode(),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hash_using
+        )
+        logger.info("Signing with private: %s" % (signature))
+        return signature
 
     def solve_challenge(self,challenge):
         #recebe aqui o challenge encriptado e resolve o, return de uma mensagem
