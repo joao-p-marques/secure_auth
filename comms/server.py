@@ -335,7 +335,7 @@ class ClientHandler(asyncio.Protocol):
                 return False
 
             if self.check_user(username, True):
-                msg = self.solve_challenge('')
+                msg = self.validate_challenge('')
             else:
                 self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
                 return False
@@ -343,7 +343,7 @@ class ClientHandler(asyncio.Protocol):
         else: #recebeu senha e ent vai assinar com sua priv
             #validou que é um user relevante, Access control
             if self.check_user(username,False):
-                msg = self.solve_challenge('')
+                msg = self.validate_challenge('')
             else:
                 self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
                 return False
@@ -366,9 +366,23 @@ class ClientHandler(asyncio.Protocol):
         logger.info("Signing with private: %s" % (signature))
         return signature
 
-    def solve_challenge(self,challenge):
-        #recebe aqui o challenge encriptado e resolve o, return de uma mensagem
-        pass
+    def validate_challenge(self,challenge_gotten):
+        #Desencriptar o challenge com a publica do outro e ser for == self.challenge ta top
+        try:
+            self.server_key.verify(
+                challenge_gotten,
+                self.challenge,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            return True
+        except expression as identifier:
+            logger.info("Challenge was not answered correctly")
+            return False
+            
 
     def check_user(self, user,cc_flag):
         logger.debug("Process Authentication for user: {}".format(user))

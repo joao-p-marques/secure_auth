@@ -178,9 +178,28 @@ class ClientProtocol(asyncio.Protocol):
     def process_answer(self,message):
         ret = self.validate_challenge(message.get('ANSWER',''))
         if ret:
-            
+            #validou por isso vai responder tambem ao challenge com a hash da sua pass
+            self.decide_cert_pass()
+            pass
         else:
             self.transport.close()
+
+    def validate_challenge(self,challenge_gotten):  
+        #Desencriptar o challenge com a publica do outro e ser for == self.challenge ta top
+        try:
+            self.server_key.verify(
+                challenge_gotten,
+                self.challenge,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+        except expression as identifier:
+            logger.info("Challenge was not answered correctly")
+            return False
+        return True
 
     def negotiate_algos(self):
         #Escolha random de um dos 
