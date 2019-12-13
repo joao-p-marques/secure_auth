@@ -192,8 +192,8 @@ class ClientHandler(asyncio.Protocol):
                 self.diffie_hellman_gen_Y()
         elif mtype == 'HELLO':
             ret = self.process_hello()
-        elif mtype == 'CHALLENGE':
-            ret = self.process_challenge(message)
+        elif mtype == 'LOGIN':
+            ret = self.process_login(message)
         
         else:
             logger.warning("Invalid message type: {}".format(message['type']))
@@ -305,37 +305,44 @@ class ClientHandler(asyncio.Protocol):
         self._send(msg)
         return True
 
-    def process_challenge(self,message) -> bool:
+    def process_login(self,message) -> bool:
         username = message.get('USERNAME', "")
-        ret = False
         #check if login type is of CC
+        msg = ''
         if message.get('login_type', "").upper() == "CC":
             if self.check_user(username,True):
-                ret = True
+                msg = self.solve_challenge()
             else:
-                ret = False
+                return False
             #get the keys from the CC and sign it
         else: #recebeu senha e ent vai assinar com sua priv
             #validou que é um user relevante, Access control
             if self.check_user(username,False):
-                ret = True
-                signature = self.sign_private()
+                msg = self.solve_challenge()
             else:
-                ret = False
+                return False
+        
+        #signature = self.sign_private()
+        if msg != '':
+            self._send(msg)
 
-        self._send(msg)
-        return ret
+        return True
 
-    def sign_private(self,message):
+    def sign_private(self,message,hash_using=hashes.SHA256()):
         signature = self.priv_key.sign(
             message,
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),
                 salt_length=padding.PSS.MAX_LENGTH
             ),
-            hashes.SHA256()
+            hash_using
         )
+        logger.info("Signing with private: %s" % (signature))
         return signature
+
+    def solve_challenge(self,challenge):
+        #recebe aqui o challenge encriptado e resolve o, return de uma mensagem
+        pass
 
     def check_user(self,user,cc_flag):
         logger.debug("Process Authentication for user: {}".format(user))

@@ -10,10 +10,9 @@ import random
 
 from cryptography import x509
 from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa,dh, padding
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, BestAvailableEncryption, PrivateFormat, PublicFormat, load_pem_public_key,load_pem_private_key
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -116,7 +115,7 @@ class ClientProtocol(asyncio.Protocol):
             backend=default_backend()
         )
         self.publ_key = self.priv_key.public_key()
-        message = {'type': 'CHALLENGE', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE':challenge}
+        message = {'type': 'LOGIN', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE':self.sign_private(challenge)}
         #self.hashed_pw = hash(self.password)
         logger.info(message)
         self._send(message)
@@ -129,10 +128,22 @@ class ClientProtocol(asyncio.Protocol):
         #fazer algo semalhante para ter as chaves do CC
         self.priv_key = 'cenas'
         self.publ_key = self.priv_key.public_key()
-        
-        message = {'type': 'CHALLENGE', 'login_type':'CC', 'USERNAME':'BuscarNumeroNoCC', 'NONCE':challenge}
+
+        message = {'type': 'LOGIN', 'login_type':'CC', 'USERNAME':'BuscarNumeroNoCC', 'NONCE':challenge}
         logger.info(message)
         self._send(message)
+
+    def sign_private(self,message,hash_using=hashes.SHA256()):
+        signature = self.priv_key.sign(
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hash_using
+        )
+        logger.info("Signing with private: %s" % (signature))
+        return signature.public_bytes(Encoding.PEM)
 
     def negotiate_algos(self):
         #Escolha random de um dos 
