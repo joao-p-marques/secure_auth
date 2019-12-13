@@ -325,39 +325,50 @@ class ClientHandler(asyncio.Protocol):
         return uuid.uuid4().hex
 
     def process_login(self, message) -> bool:
+        # we grab the
         username = message.get('USERNAME', "")
+
+
+
+
+
+
+
+
+
+
         #check if login type is of CC
-        msg = ''
-        if message.get('login_type', "").upper() == "CC":
-            # validar certificado do user
-            client_cert_pem = base64.b64decode(message.get('USER_CERT'))
-            client_cert = x509.load_pem_x509_certificate(client_cert_pem, default_backend())
+        # msg = ''
+        # if message.get('login_type', "").upper() == "CC":
+        #     # validar certificado do user
+        #     client_cert_pem = base64.b64decode(message.get('USER_CERT'))
+        #     client_cert = x509.load_pem_x509_certificate(client_cert_pem, default_backend())
 
-            self.user_key = client_cert.public_key()
+        #     self.user_key = client_cert.public_key()
 
-            if not self.validator.validate_certificate(client_cert):
-                self._send({'type': 'ERROR', 'message': 'Certificate not validated'})
-                return False
+        #     if not self.validator.validate_certificate(client_cert):
+        #         self._send({'type': 'ERROR', 'message': 'Certificate not validated'})
+        #         return False
 
-            if self.check_user(username, True):
-                msg = self.validate_challenge('')
-            else:
-                self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
-                return False
-            # get the keys from the CC and sign it
-        else: #recebeu senha e ent vai assinar com sua priv
-            #validou que é um user relevante, Access control
-            if self.check_user(username,False):
-                msg = self.validate_challenge('')
-            else:
-                self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
-                return False
+        #     if self.check_user(username, True):
+        #         msg = self.validate_challenge('')
+        #     else:
+        #         self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
+        #         return False
+        #     # get the keys from the CC and sign it
+        # else: #recebeu senha e ent vai assinar com sua priv
+        #     #validou que é um user relevante, Access control
+        #     if self.check_user(username,False):
+        #         msg = self.validate_challenge('')
+        #     else:
+        #         self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
+        #         return False
         
-        #signature = self.sign_private()
-        if msg != '':
-            self._send(msg)
+        # #signature = self.sign_private()
+        # if msg != '':
+        #     self._send(msg)
 
-        return True
+        # return True
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
         if self.priv_key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo) == self.certificate.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo):
@@ -389,7 +400,7 @@ class ClientHandler(asyncio.Protocol):
             else:
                 self.password_solve()
             return True
-        except:
+        except cryptography.exceptions.InvalidSignature:
             logger.info("Challenge was not answered correctly")
             return False
             

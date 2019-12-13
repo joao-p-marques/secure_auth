@@ -11,6 +11,7 @@ import random
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives.asymmetric import rsa,dh, padding
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -107,7 +108,6 @@ class ClientProtocol(asyncio.Protocol):
             #     default_backend()
             # )
             self.server_key = self.server_cert.public_key()
-            logger.debug('Server key: ' + self.server_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode())
             msg = {'type':'CHALLENGE','NONCE':self.challenge}
             self._send(msg)
             return True
@@ -133,13 +133,13 @@ class ClientProtocol(asyncio.Protocol):
         self.username = input("User: ")
         self.password = getpass.getpass()
         self.challenge = self.create_challenge()
-        self.priv_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
-        )
-        self.publ_key = self.priv_key.public_key()
-        message = {'type': 'LOGIN', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE': base64.b64encode(self.sign_private(self.challenge)).decode()}
+        #we are gonna hash that later
+        message = {
+                'type': 'LOGIN', 
+                'login_type':'CC', 
+                'USERNAME': cc_cert.subject.rfc4514_string(), 
+                'ANSWER': self.sign_private(self.challenge_gotten,False) 
+                }
         #self.hashed_pw = hash(self.password)
         logger.info(message)
         self._send(message)
@@ -156,7 +156,6 @@ class ClientProtocol(asyncio.Protocol):
         #o username vai ser o codigo do cc, tem que estar na bd
         #joao pega aqui
         #talvez fazermos mais um campo na bd que assume
-        self.challenge = self.create_challenge()
         #fazer algo semalhante para ter as chaves do CC
         self.priv_key = self.cc_authenticator.private_key()
         self.publ_key = cc_cert.public_key()
@@ -165,41 +164,55 @@ class ClientProtocol(asyncio.Protocol):
                 'type': 'LOGIN', 
                 'login_type':'CC', 
                 'USERNAME': cc_cert.subject.rfc4514_string(), 
-                'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(), 
-                'NONCE':self.challenge
+                'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(),
+                'ANSWER': self.sign_private(self.challenge_gotten,True) 
                 }
+
         logger.info(message)
         self._send(message)
 
-    def sign_private(self,message,hash_using=hashes.SHA256()):
-        signature = self.priv_key.sign(
-            message.encode(),
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
-            hash_using
-        )
+    def sign_private(self,message,flag_cc):
+        if flag_cc:
+            signature = self.priv_key.sign(
+                message.encode(),
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+        else:
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=self.password,
+                iterations=100000,
+                backend=backend
+            )
+            signature = kdf.derive(message.encode())
+        
         logger.info("Signing with private: %s" % (signature))
         return signature
 
     def process_answer(self,message):
-        challenge_gotten = base64.b64decode(message.get('ANSWER',''))
-        ret = self.validate_challenge(challenge_gotten)
+        self.challenge_gotten = base64.b64decode(message.get('ANSWER',''))
+        ret = self.validate_challenge(self.challenge_gotten)
         if ret:
             #validou por isso vai responder tambem ao challenge com a hash da sua pass
-            self.decide_cert_pass()
-            pass
+            msg = self.decide_cert_pass()
+            self._send(msg)
+            self.state = STATE_DATA
+            return True
         else:
             self.transport.close()
+            return False
 
     def validate_challenge(self,challenge_gotten):  
         #Desencriptar o challenge com a publica do outro e ser for == self.challenge ta top
-        logger.info("Challenge: %s , self.challenge: %s" % (challenge_gotten,self.challenge))
         try:
             logger.debug(self.server_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
             self.server_key.verify(
-                challenge_gotten,
+                self.challenge_gotten,
                 self.challenge.encode(),
                 padding.PSS(
                     mgf=padding.MGF1(hashes.SHA256()),
@@ -207,7 +220,7 @@ class ClientProtocol(asyncio.Protocol):
                 ),
                 hashes.SHA256()
             )
-        except:
+        except cryptography.exceptions.InvalidSignature:
             logger.info("Challenge was not answered correctly")
             return False
         return True
