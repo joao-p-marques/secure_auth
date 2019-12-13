@@ -102,6 +102,10 @@ class ClientProtocol(asyncio.Protocol):
         valid = self.validator.validate_certificate(self.server_cert)
         self.challenge = self.create_challenge()
         if valid:
+            # self.server_key = load_pem_public_key(
+            #     self.server_cert.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo),
+            #     default_backend()
+            # )
             self.server_key = self.server_cert.public_key()
             logger.debug('Server key: ' + self.server_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode())
             msg = {'type':'CHALLENGE','NONCE':self.challenge}
@@ -135,7 +139,7 @@ class ClientProtocol(asyncio.Protocol):
             backend=default_backend()
         )
         self.publ_key = self.priv_key.public_key()
-        message = {'type': 'LOGIN', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE':self.sign_private(self.challenge)}
+        message = {'type': 'LOGIN', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE': base64.b64encode(self.sign_private(self.challenge)).decode()}
         #self.hashed_pw = hash(self.password)
         logger.info(message)
         self._send(message)
@@ -180,11 +184,33 @@ class ClientProtocol(asyncio.Protocol):
         return signature
 
     def process_answer(self,message):
-        ret = self.validate_challenge(message.get('ANSWER',''))
+        challenge_gotten = base64.b64decode(message.get('ANSWER',''))
+        ret = self.validate_challenge(challenge_gotten)
         if ret:
-            pass    
+            #validou por isso vai responder tambem ao challenge com a hash da sua pass
+            self.decide_cert_pass()
+            pass
         else:
             self.transport.close()
+
+    def validate_challenge(self,challenge_gotten):  
+        #Desencriptar o challenge com a publica do outro e ser for == self.challenge ta top
+        logger.info("Challenge: %s , self.challenge: %s" % (challenge_gotten,self.challenge))
+        try:
+            logger.debug(self.server_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
+            self.server_key.verify(
+                challenge_gotten,
+                self.challenge.encode(),
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+        except:
+            logger.info("Challenge was not answered correctly")
+            return False
+        return True
 
     def negotiate_algos(self):
         #Escolha random de um dos 
