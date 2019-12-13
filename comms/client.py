@@ -161,10 +161,13 @@ class ClientProtocol(asyncio.Protocol):
         self.priv_key = self.cc_authenticator.private_key()
         self.publ_key = cc_cert.public_key()
 
+        cc_num = cc_cert.subject.get_attributes_for_oid(NameOID.SERIAL_NUMBER)[0].value
+        print(cc_num)
+
         message = {
                 'type': 'LOGIN', 
                 'login_type':'CC', 
-                'USERNAME': cc_cert.subject.rfc4514_string(), 
+                'USERNAME': cc_num,
                 'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(), 
                 'NONCE':self.challenge
                 }
