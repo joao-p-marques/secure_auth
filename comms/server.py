@@ -84,8 +84,8 @@ class ClientHandler(asyncio.Protocol):
         self.mode = None
         self.hash_function = None
 
-        print('done')
         self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/server/PTEID/'], 'certs/server/crls')
+        self.user_key = None
 
     def connection_made(self, transport) -> None:
         """
@@ -317,6 +317,7 @@ class ClientHandler(asyncio.Protocol):
         #logger.info("Gotten challenge: %s " % (gotten_challenge))
         #Aqui vamos enviar a resposta ao challenge + um proprio desafio
         msg = { 'type':'CHALLENGE_ANSWER', 'ANSWER':base64.b64encode(self.sign_private(gotten_challenge)).decode(), 'NONCE':self.challenge }
+        logger.info(msg)
         self._send(msg)
         return True
 
@@ -332,7 +333,10 @@ class ClientHandler(asyncio.Protocol):
             client_cert_pem = base64.b64decode(message.get('USER_CERT'))
             client_cert = x509.load_pem_x509_certificate(client_cert_pem, default_backend())
 
+            self.user_key = client_cert.public_key()
+
             if not self.validator.validate_certificate(client_cert):
+                self._send({'type': 'ERROR', 'message': 'Certificate not validated'})
                 return False
 
             if self.check_user(username, True):
@@ -356,6 +360,8 @@ class ClientHandler(asyncio.Protocol):
         return True
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
+        if self.priv_key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo) == self.certificate.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo):
+            logger.info("SAO IGUAIS")
         signature = self.priv_key.sign(
             message.encode(),
             padding.PSS(
@@ -370,20 +376,25 @@ class ClientHandler(asyncio.Protocol):
     def validate_challenge(self,challenge_gotten):
         #Desencriptar o challenge com a publica do outro e ser for == self.challenge ta top
         try:
-            self.server_key.verify(
-                challenge_gotten,
-                self.challenge,
-                padding.PSS(
-                    mgf=padding.MGF1(hashes.SHA256()),
-                    salt_length=padding.PSS.MAX_LENGTH
-                ),
-                hashes.SHA256()
-            )
+            if self.user_key is not None:
+                self.user_key.verify(
+                    challenge_gotten.encode(),
+                    self.challenge,
+                    padding.PSS(
+                        mgf=padding.MGF1(hashes.SHA256()),
+                        salt_length=padding.PSS.MAX_LENGTH
+                    ),
+                    hashes.SHA256()
+                )
+            else:
+                self.password_solve()
             return True
-        except expression as identifier:
+        except:
             logger.info("Challenge was not answered correctly")
             return False
             
+    def password_solve():
+        pass
 
     def check_user(self, user,cc_flag):
         logger.debug("Process Authentication for user: {}".format(user))
@@ -416,6 +427,8 @@ class ClientHandler(asyncio.Protocol):
             self.file = None
 
         self.state = STATE_CLOSE
+
+        self.user_key = None
 
         return True
 
