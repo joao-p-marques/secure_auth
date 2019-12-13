@@ -8,9 +8,10 @@ import re
 import os
 from aio_tcpserver import tcp_server
 
+import cryptography
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, serialization, padding
+from cryptography.hazmat.primitives import hashes, serialization, padding, hmac
 from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, PublicFormat, load_pem_public_key,load_pem_private_key
 from cryptography.hazmat.primitives.asymmetric import dh,rsa
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -325,50 +326,44 @@ class ClientHandler(asyncio.Protocol):
         return uuid.uuid4().hex
 
     def process_login(self, message) -> bool:
-        # we grab the
-        username = message.get('USERNAME', "")
+        # we check which type of login it is
+        type_login = message.get('login_type', "")
+        username = message.get('USERNAME','')
 
+        if type_login == "CC":
+            client_cert_pem = base64.b64decode(message.get('USER_CERT'))
+            client_cert = x509.load_pem_x509_certificate(client_cert_pem, default_backend())
 
+            self.user_key = client_cert.public_key()
 
+            if not self.validator.validate_certificate(client_cert):
+                self._send({'type': 'ERROR', 'message': 'Certificate not validated'})
+                return False
 
+            if self.check_user(username, True):
+                msg = self.validate_challenge('')
+            else:
+                self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
+                return False
+            # get the keys from the CC and sign it
 
+        elif type_login == "USER":
+            if username not in self.user_data:
+                self._send({'type': 'ERROR', 'message': 'Access Denied'})
+                return False
+            else:
+                #verificar se a pass esta bem aqui
 
+                if signature != message.get('ANSWER',''):
+                    self._send({'type': 'ERROR', 'message': 'Authentication Failed'})
+                    return False
+                return True
 
+        else:
+            self._send({'type': 'ERROR', 'message': 'Login method not supported'})
+            return False
 
-
-
-        #check if login type is of CC
-        # msg = ''
-        # if message.get('login_type', "").upper() == "CC":
-        #     # validar certificado do user
-        #     client_cert_pem = base64.b64decode(message.get('USER_CERT'))
-        #     client_cert = x509.load_pem_x509_certificate(client_cert_pem, default_backend())
-
-        #     self.user_key = client_cert.public_key()
-
-        #     if not self.validator.validate_certificate(client_cert):
-        #         self._send({'type': 'ERROR', 'message': 'Certificate not validated'})
-        #         return False
-
-        #     if self.check_user(username, True):
-        #         msg = self.validate_challenge('')
-        #     else:
-        #         self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
-        #         return False
-        #     # get the keys from the CC and sign it
-        # else: #recebeu senha e ent vai assinar com sua priv
-        #     #validou que é um user relevante, Access control
-        #     if self.check_user(username,False):
-        #         msg = self.validate_challenge('')
-        #     else:
-        #         self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
-        #         return False
-        
-        # #signature = self.sign_private()
-        # if msg != '':
-        #     self._send(msg)
-
-        # return True
+        return True
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
         if self.priv_key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo) == self.certificate.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo):
@@ -403,9 +398,6 @@ class ClientHandler(asyncio.Protocol):
         except cryptography.exceptions.InvalidSignature:
             logger.info("Challenge was not answered correctly")
             return False
-            
-    def password_solve():
-        pass
 
     def check_user(self, user,cc_flag):
         logger.debug("Process Authentication for user: {}".format(user))

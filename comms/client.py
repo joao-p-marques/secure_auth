@@ -8,12 +8,13 @@ import coloredlogs, logging
 import os
 import random
 
+import cryptography
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives.asymmetric import rsa,dh, padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, BestAvailableEncryption, PrivateFormat, PublicFormat, load_pem_public_key,load_pem_private_key
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -136,8 +137,8 @@ class ClientProtocol(asyncio.Protocol):
         #we are gonna hash that later
         message = {
                 'type': 'LOGIN', 
-                'login_type':'CC', 
-                'USERNAME': cc_cert.subject.rfc4514_string(), 
+                'login_type':'USER', 
+                'USERNAME': self.username, 
                 'ANSWER': self.sign_private(self.challenge_gotten,False) 
                 }
         #self.hashed_pw = hash(self.password)
@@ -165,7 +166,7 @@ class ClientProtocol(asyncio.Protocol):
                 'login_type':'CC', 
                 'USERNAME': cc_cert.subject.rfc4514_string(), 
                 'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(),
-                'ANSWER': self.sign_private(self.challenge_gotten,True) 
+                'ANSWER': self.sign_private(self.challenge_gotten,True).decode() 
                 }
 
         logger.info(message)
@@ -182,17 +183,17 @@ class ClientProtocol(asyncio.Protocol):
                 hashes.SHA256()
             )
         else:
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=self.password,
-                iterations=100000,
-                backend=backend
-            )
-            signature = kdf.derive(message.encode())
+            h = hmac.HMAC(self.hash_pw(self.password), hashes.SHA256(), backend=default_backend())
+            h.update(message.encode())
+            signature = h.finalize()
         
         logger.info("Signing with private: %s" % (signature))
         return signature
+
+    def hash_pw(self,pw):
+        h = hashes.Hash(hashes.SHA512(), backend=default_backend())
+        h.update(pw.encode())
+        return h.finalize()
 
     def process_answer(self,message):
         self.challenge_gotten = base64.b64decode(message.get('ANSWER',''))
