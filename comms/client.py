@@ -17,6 +17,8 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, BestAvailableEncryption, PrivateFormat, PublicFormat, load_pem_public_key,load_pem_private_key
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from cc_authenticator import *
+
 logger = logging.getLogger('root')
 
 STATE_CONNECT = 0
@@ -63,6 +65,9 @@ class ClientProtocol(asyncio.Protocol):
         self.mode = None
         self.sintese = None
 
+        self.cc_authenticator = None
+
+
     def connection_made(self, transport) -> None:
         """
         Called when the client connects.
@@ -76,11 +81,12 @@ class ClientProtocol(asyncio.Protocol):
 
         self.state = STATE_OPEN
         self.start_connection()
-        self.negotiate_algos()
+        # self.negotiate_algos()
 
     def start_connection(self):
         message = {'type': 'HELLO'}
         self._send(message)
+        return
 
     def validate_cert(self,message):
         #validate chain here
@@ -121,6 +127,11 @@ class ClientProtocol(asyncio.Protocol):
         self._send(message)
 
     def authenticate_cc(self):
+        if not self.cc_authenticator:
+            self.cc_authenticator = CC_authenticator()
+
+        cc_cert = self.cc_authenticator.get_certificate()
+
         #o username vai ser o codigo do cc, tem que estar na bd
         #joao pega aqui
         #talvez fazermos mais um campo na bd que assume
@@ -129,7 +140,7 @@ class ClientProtocol(asyncio.Protocol):
         self.priv_key = 'cenas'
         self.publ_key = self.priv_key.public_key()
 
-        message = {'type': 'LOGIN', 'login_type':'CC', 'USERNAME':'BuscarNumeroNoCC', 'NONCE':challenge}
+        message = {'type': 'LOGIN', 'login_type':'CC', 'USERNAME': self.username, 'USER_CERT': cc_cert, 'NONCE':challenge}
         logger.info(message)
         self._send(message)
 
@@ -223,6 +234,7 @@ class ClientProtocol(asyncio.Protocol):
                 # logger.debug('MIC Accepted')
                 message = msg
                 mtype = msg.get('type')
+                return
             else:
                 logger.debug('MIC Wrong. Message compromissed')
                 return
@@ -235,6 +247,7 @@ class ClientProtocol(asyncio.Protocol):
             message = self.sym_decrypt(e_data, iv)
             message = json.loads(message.decode())
             mtype = message.get('type', None)
+            return
 
         logger.debug(f"Received (decrypted): {message}")
 
@@ -269,8 +282,10 @@ class ClientProtocol(asyncio.Protocol):
             return
         elif mtype == 'ERROR':
             logger.warning("Got error from server: {}".format(message.get('data', None)))
+            return
         else:
             logger.warning("Invalid message type")
+            return
 
         self.transport.close()
         self.loop.stop()
