@@ -48,6 +48,11 @@ class ClientProtocol(asyncio.Protocol):
 
         self.key = None
 
+        #Data important
+        self.server_cert = ''
+        self.priv_key = ''
+        self.publ_key = ''
+
         #Arrays of possible ciphers to take from
         self.ciphers = ['AES','3DES','ChaCha20']
         self.modes = ['CBC','GCM','ECB']
@@ -80,12 +85,10 @@ class ClientProtocol(asyncio.Protocol):
     def validate_cert(self,message):
         #validate chain here
         if True:
-            logger.info("Deu")
             msg = self.decide_cert_pass()
             self._send(msg)
             return True
         else:
-            logger.info("Nao validei")
             return False
 
     def decide_cert_pass(self):
