@@ -101,7 +101,7 @@ load_certificates('certs/', roots, intermediate_certs)
 load_certificates('certs/PTEID/', roots, intermediate_certs)
 load_crls('certs/crls', crls)
 
-c, valid = load_certificate('certs/cc_cert.pem')
+c, valid = load_certificate('certs/user_certs/cc_cert.pem')
 
 cert_chain = build_chain([], c)
 print(cert_chain)
