@@ -15,6 +15,8 @@ from cryptography.hazmat.primitives.asymmetric import dh,rsa
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from certificate_validator import *
+
 logger = logging.getLogger('root')
 
 STATE_CONNECT = 0
@@ -42,10 +44,10 @@ class ClientHandler(asyncio.Protocol):
 
         self.key = None
 
+        file = None
         #Auth
         with open('userdb','rb') as f:
             file = f.read().decode()
-
         lines = re.split('\n',file)
         self.elems = [re.split(':',line) for line in lines]
         self.user_data = {}
@@ -63,8 +65,7 @@ class ClientHandler(asyncio.Protocol):
             pem_data = f.read()
 
         cert = x509.load_pem_x509_certificate(pem_data, default_backend())
-        cert = cert.public_bytes(Encoding.PEM)
-        self.certificate = str(cert)
+        self.certificate = cert
 
         #Starting publ and priv keys for session
         with open('server/ServerPrat_Key.pem','rb') as f:
@@ -81,6 +82,8 @@ class ClientHandler(asyncio.Protocol):
         self.cipher = None
         self.mode = None
         self.hash_function = None
+
+        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/server/PTEID/'], ['certs/crls'])
 
     def connection_made(self, transport) -> None:
         """
@@ -191,6 +194,7 @@ class ClientHandler(asyncio.Protocol):
             if not self.private_key:
                 self.diffie_hellman_gen_Y()
         elif mtype == 'HELLO':
+            logger.debug('ola')
             ret = self.process_hello()
         elif mtype == 'LOGIN':
             ret = self.process_login(message)
@@ -300,21 +304,25 @@ class ClientHandler(asyncio.Protocol):
         logger.info("Sending Certificate")
         msg = {
             'type' : 'CERT',
-            'cert' : self.certificate
+            'cert' : base64.b64encode(self.certificate.public_bytes(Encoding.PEM)).decode()
             }
         self._send(msg)
         return True
 
-    def process_login(self,message) -> bool:
+    def process_login(self, message) -> bool:
         username = message.get('USERNAME', "")
         #check if login type is of CC
         msg = ''
         if message.get('login_type', "").upper() == "CC":
-            if self.check_user(username,True):
+            # validar certificado do user
+            if not self.validator.validate_certificate(message.get('USER_CERT')):
+                return False
+
+            if self.check_user(username, True):
                 msg = self.solve_challenge('')
             else:
                 return False
-            #get the keys from the CC and sign it
+            # get the keys from the CC and sign it
         else: #recebeu senha e ent vai assinar com sua priv
             #validou que é um user relevante, Access control
             if self.check_user(username,False):
@@ -345,7 +353,7 @@ class ClientHandler(asyncio.Protocol):
         #recebe aqui o challenge encriptado e resolve o, return de uma mensagem
         pass
 
-    def check_user(self,user,cc_flag):
+    def check_user(self, user,cc_flag):
         logger.debug("Process Authentication for user: {}".format(user))
         #do the same for process
         if cc_flag:

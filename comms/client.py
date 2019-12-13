@@ -17,6 +17,9 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, BestAvailableEncryption, PrivateFormat, PublicFormat, load_pem_public_key,load_pem_private_key
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from cc_authenticator import *
+from certificate_validator import *
+
 logger = logging.getLogger('root')
 
 STATE_CONNECT = 0
@@ -63,6 +66,10 @@ class ClientProtocol(asyncio.Protocol):
         self.mode = None
         self.sintese = None
 
+        self.cc_authenticator = None
+
+        self.validator = Certificate_Validator(['/etc/ssl/certs/', 'certs/client/server_certs'], [], ['certs/crls'])
+
     def connection_made(self, transport) -> None:
         """
         Called when the client connects.
@@ -81,9 +88,13 @@ class ClientProtocol(asyncio.Protocol):
         message = {'type': 'HELLO'}
         self._send(message)
 
-    def validate_cert(self,message):
+    def validate_cert(self, pem_data):
         #validate chain here
-        if True:
+        # print(pem_data)
+        self.server_cert = x509.load_pem_x509_certificate(pem_data, default_backend())
+        print(self.server_cert.issuer)
+        valid = self.validator.validate_certificate(self.server_cert)
+        if valid:
             msg = self.decide_cert_pass()
             self._send(msg)
             return True
@@ -121,15 +132,26 @@ class ClientProtocol(asyncio.Protocol):
 
 
     def authenticate_cc(self):
+        if not self.cc_authenticator:
+            self.cc_authenticator = CC_authenticator()
+
+        cc_cert = self.cc_authenticator.get_certificate()
+
         #o username vai ser o codigo do cc, tem que estar na bd
         #joao pega aqui
         #talvez fazermos mais um campo na bd que assume
         challenge = uuid.uuid1().hex
         #fazer algo semalhante para ter as chaves do CC
-        self.priv_key = 'cenas'
-        self.publ_key = self.priv_key.public_key()
+        self.priv_key = self.cc_authenticator.private_key()
+        self.publ_key = cc_cert.public_key()
 
-        message = {'type': 'LOGIN', 'login_type':'CC', 'USERNAME':'BuscarNumeroNoCC', 'NONCE':challenge}
+        message = {
+                'type': 'LOGIN', 
+                'login_type':'CC', 
+                'USERNAME': cc_cert.subject.rfc4514_string(), 
+                'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(), 
+                'NONCE':challenge
+                }
         logger.info(message)
         self._send(message)
 
@@ -225,6 +247,7 @@ class ClientProtocol(asyncio.Protocol):
                 # logger.debug('MIC Accepted')
                 message = msg
                 mtype = msg.get('type')
+                return
             else:
                 logger.debug('MIC Wrong. Message compromissed')
                 return
@@ -237,6 +260,7 @@ class ClientProtocol(asyncio.Protocol):
             message = self.sym_decrypt(e_data, iv)
             message = json.loads(message.decode())
             mtype = message.get('type', None)
+            return
 
         logger.debug(f"Received (decrypted): {message}")
 
@@ -247,7 +271,7 @@ class ClientProtocol(asyncio.Protocol):
             logger.info("Sent Key")
             return
         elif mtype == 'CERT':
-            ret = self.validate_cert(message)
+            ret = self.validate_cert(base64.b64decode(message.get('cert')))
             return True if ret else self.transport.close()
 
         elif mtype == 'DH_KEY_EXCHANGE':
@@ -273,8 +297,10 @@ class ClientProtocol(asyncio.Protocol):
             return
         elif mtype == 'ERROR':
             logger.warning("Got error from server: {}".format(message.get('data', None)))
+            return
         else:
             logger.warning("Invalid message type")
+            return
 
         self.transport.close()
         self.loop.stop()
