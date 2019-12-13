@@ -16,17 +16,16 @@ O servidor deverá conseguir provar a sua identidade, evintando-se ataques de Mi
 ### Implementation:
 - [ x ] Protocolo para autenticação de utentes através da apresentação de senhas
 - [ x ] Mecanismo para controlo de acesso
-- [  ] Protocolo para autenticação de utentes através do cartão de cidadão
-- [  ] Protocolo para autenticação do servidor através de certificados X.509
+- [ x ] Protocolo para autenticação de utentes através do cartão de cidadão
+- [ x ] Protocolo para autenticação do servidor através de certificados X.509
 
 ### Bonus Points:
 - [  ] Outros mecanismos que confiram maior segurança ao sistema (Opcional)  
-    - [  ] Hash( Hash (Salt + Password) + Nonce ) -> Secure senha
 
 ## Report:
 O relatório deverá descrever o protocolo e demonstrar o funcionamento de cada uma das 4 funcionalidade + capturas de ecrã  
 
 ## Bibliography:
  * [Slides 5 and 6](https://joao.barraca.pt/teaching/sio/2019/)
- * Cryptography.io
+ * [Cryptography.io](https://cryptography.io)
  * [PyKCS11](https://github.com/LudovicRousseau/PyKCS11)
