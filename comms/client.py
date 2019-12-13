@@ -74,6 +74,8 @@ class ClientProtocol(asyncio.Protocol):
 
         self.validator = Certificate_Validator(['/etc/ssl/certs/', 'certs/client/server_certs'], [], 'certs/client/crls')
 
+        print('done')
+
     def connection_made(self, transport) -> None:
         """
         Called when the client connects.
@@ -100,6 +102,8 @@ class ClientProtocol(asyncio.Protocol):
         valid = self.validator.validate_certificate(self.server_cert)
         self.challenge = self.create_challenge()
         if valid:
+            self.server_key = self.server_cert.public_key()
+            logger.debug('Server key: ' + self.server_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode())
             msg = {'type':'CHALLENGE','NONCE':self.challenge}
             self._send(msg)
             return True
@@ -178,7 +182,7 @@ class ClientProtocol(asyncio.Protocol):
     def process_answer(self,message):
         ret = self.validate_challenge(message.get('ANSWER',''))
         if ret:
-            
+            pass    
         else:
             self.transport.close()
 

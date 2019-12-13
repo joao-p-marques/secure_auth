@@ -108,15 +108,21 @@ class Certificate_Validator():
             self.crls.append(crl)
 
     def load_crls_cert(self, cert):
-        for ext in cert.extensions.get_extension_for_class(x509.CRLDistributionPoints).value:
-            for name in ext.full_name:
-                fname = wget.download(name.value, self.crls_path + name + '.crl')
-                print(fname)
+        try:
+            for ext in cert.extensions.get_extension_for_class(x509.CRLDistributionPoints).value:
+                for name in ext.full_name:
+                    fname = wget.download(name.value, self.crls_path + name + '.crl')
+                    print(fname)
+        except:
+            print('No CRLs found')
 
-        for ext in cert.extensions.get_extension_for_class(x509.FreshestCRL).value:
-            for name in ext.full_name:
-                fname = wget.download(name.value, self.crls_path + name + '.crl')
-                print(fname)
+        try:
+            for ext in cert.extensions.get_extension_for_class(x509.FreshestCRL).value:
+                for name in ext.full_name:
+                    fname = wget.download(name.value, self.crls_path + name + '.crl')
+                    print(fname)
+        except:
+            print('No Delta CRLs found.')
 
 
     def validate_certificate(self, cert):

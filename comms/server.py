@@ -84,7 +84,8 @@ class ClientHandler(asyncio.Protocol):
         self.mode = None
         self.hash_function = None
 
-        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/server/PTEID/'], ['certs/crls'], 'certs/server/crls')
+        print('done')
+        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/server/PTEID/'], 'certs/server/crls')
 
     def connection_made(self, transport) -> None:
         """
