@@ -50,11 +50,12 @@ class ClientHandler(asyncio.Protocol):
             file = f.read().decode()
         lines = re.split('\n',file)
         self.elems = [re.split(':',line) for line in lines]
-        self.users = [elem[0] for elem in self.elems]
-        self.cc_users = [elem[1] for elem in self.elems]
         self.user_data = {}
+        self.user_cc = {}
         for elem in self.elems:
             self.user_data[elem[0]] = elem[1:]
+        for elem in self.elems:
+            self.user_cc[elem[1]] = elem[0:1] + elem[2:]
 
         self.parameters = None
         self.private_key = None
@@ -62,14 +63,13 @@ class ClientHandler(asyncio.Protocol):
         #server cert
         with open('server/ServerPrat.crt','rb') as f:
             pem_data = f.read()
-        f.close()
+
         cert = x509.load_pem_x509_certificate(pem_data, default_backend())
         self.certificate = cert
 
         #Starting publ and priv keys for session
         with open('server/ServerPrat_Key.pem','rb') as f:
             pem_data = f.read()
-        f.close()
 
         self.priv_key = load_pem_private_key(pem_data, password=None, backend=default_backend())
         self.publ_key = self.priv_key.public_key()
@@ -148,11 +148,11 @@ class ClientHandler(asyncio.Protocol):
             return
 
         mtype = message.get('type', "").upper()
+        logger.info(message)
 
         if mtype == 'MIC':
             mic = base64.b64decode(message.get('mic'))
             msg = message.get('msg')
-
             if self.hash_mic(json.dumps(msg).encode()) == mic:
                 # logger.debug('MIC Accepted')
                 message = msg
@@ -170,7 +170,7 @@ class ClientHandler(asyncio.Protocol):
             message = json.loads(message.decode())
             mtype = message.get('type', None)
 
-        logger.debug(f"Received (decrypted): {message}")
+        logger.info(f"Received (decrypted): {message}")
 
         if mtype == 'DH_KEY_EXCHANGE':
             ret = self.get_key(message.get('data').get('pub_key'))
@@ -319,14 +319,14 @@ class ClientHandler(asyncio.Protocol):
                 return False
 
             if self.check_user(username, True):
-                msg = self.solve_challenge()
+                msg = self.solve_challenge('')
             else:
                 return False
             # get the keys from the CC and sign it
         else: #recebeu senha e ent vai assinar com sua priv
             #validou que é um user relevante, Access control
-            if self.check_user(username, False):
-                msg = self.solve_challenge()
+            if self.check_user(username,False):
+                msg = self.solve_challenge('')
             else:
                 return False
         
@@ -337,16 +337,17 @@ class ClientHandler(asyncio.Protocol):
         return True
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
-        signature = self.priv_key.sign(
-            message,
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
-            hash_using
-        )
-        logger.info("Signing with private: %s" % (signature))
-        return signature
+        # signature = self.priv_key.sign(
+        #     message,
+        #     padding.PSS(
+        #         mgf=padding.MGF1(hashes.SHA256()),
+        #         salt_length=padding.PSS.MAX_LENGTH
+        #     ),
+        #     hash_using
+        # )
+        # logger.info("Signing with private: %s" % (signature))
+        # return signature
+        return ""
 
     def solve_challenge(self,challenge):
         #recebe aqui o challenge encriptado e resolve o, return de uma mensagem
@@ -356,12 +357,12 @@ class ClientHandler(asyncio.Protocol):
         logger.debug("Process Authentication for user: {}".format(user))
         #do the same for process
         if cc_flag:
-            if user in self.cc_users and self.user_data[user][2]=="AUTH_WRITE":
+            if user in self.user_cc.keys() and self.user_data[user][2]=="AUTH_WRITE":
                 logger.info("User %s can write files" % (user))
                 return True
             logger.info("User %s cant write files" % (user))
         else:
-            if user in self.users and self.user_data[user][2]=="AUTH_WRITE":
+            if user in self.user_data.keys() and self.user_data[user][2]=="AUTH_WRITE":
                 logger.info("User %s can write files" % (user))
                 return True
             logger.info("User %s cant write files" % (user))
