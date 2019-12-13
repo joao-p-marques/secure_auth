@@ -9,7 +9,7 @@ from aio_tcpserver import tcp_server
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes, serialization, padding
 from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, PublicFormat, load_pem_public_key,load_pem_private_key
 from cryptography.hazmat.primitives.asymmetric import dh,rsa
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -308,21 +308,34 @@ class ClientHandler(asyncio.Protocol):
     def process_challenge(self,message) -> bool:
         username = message.get('USERNAME', "")
         ret = False
+        #check if login type is of CC
         if message.get('login_type', "").upper() == "CC":
             if self.check_user(username,True):
                 ret = True
             else:
                 ret = False
             #get the keys from the CC and sign it
-        else: #recebeu senha e ent vai assinar com pub
+        else: #recebeu senha e ent vai assinar com sua priv
+            #validou que é um user relevante, Access control
             if self.check_user(username,False):
                 ret = True
-                self.sign_private()
+                signature = self.sign_private()
             else:
                 ret = False
 
         self._send(msg)
         return ret
+
+    def sign_private(self,message):
+        signature = self.priv_key.sign(
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return signature
 
     def check_user(self,user,cc_flag):
         logger.debug("Process Authentication for user: {}".format(user))

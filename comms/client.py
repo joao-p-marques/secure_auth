@@ -15,7 +15,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, BestAvailableEncryption, PrivateFormat, PublicFormat, load_pem_public_key
+from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, BestAvailableEncryption, PrivateFormat, PublicFormat, load_pem_public_key,load_pem_private_key
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 logger = logging.getLogger('root')
@@ -49,9 +49,10 @@ class ClientProtocol(asyncio.Protocol):
         self.key = None
 
         #Data important
-        self.server_cert = ''
-        self.priv_key = ''
-        self.publ_key = ''
+        self.server_cert = None
+        self.server_key = None
+        self.priv_key = None
+        self.publ_key = None
 
         #Arrays of possible ciphers to take from
         self.ciphers = ['AES','3DES','ChaCha20']
@@ -109,6 +110,12 @@ class ClientProtocol(asyncio.Protocol):
         self.username = input("User: ")
         self.password = getpass.getpass()
         challenge = uuid.uuid1().hex
+        self.priv_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend()
+        )
+        self.publ_key = self.priv_key.public_key()
         message = {'type': 'CHALLENGE', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE':challenge}
         #self.hashed_pw = hash(self.password)
         logger.info(message)
@@ -119,6 +126,10 @@ class ClientProtocol(asyncio.Protocol):
         #joao pega aqui
         #talvez fazermos mais um campo na bd que assume
         challenge = uuid.uuid1().hex
+        #fazer algo semalhante para ter as chaves do CC
+        self.priv_key = 'cenas'
+        self.publ_key = self.priv_key.public_key()
+        
         message = {'type': 'CHALLENGE', 'login_type':'CC', 'USERNAME':'BuscarNumeroNoCC', 'NONCE':challenge}
         logger.info(message)
         self._send(message)

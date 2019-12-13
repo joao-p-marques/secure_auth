@@ -8,19 +8,20 @@ O servidor deverá conseguir provar a sua identidade, evintando-se ataques de Mi
 ## Main objectives:
 
 ### Architecture:
-- [  ] Protocolo (planeamento e descrição) para a autenticação de utentes através de um mecanismo de desafio resposta (não é necessário considerar o registo online dos clientes)
-- [  ] Mecanismo para controlo de acesso, que permita indicar explicitamente se um utente pode ou não transferir ficheiros
-- [  ] Protocolo (planeamento e descrição) para a autenticação de utentes através do cartão de cidadão
-- [  ] Protocolo (planeamento e descrição) para a autenticação do servidor utilizando certificados X.509
+- [ x ] Protocolo (planeamento e descrição) para a autenticação de utentes através de um mecanismo de desafio resposta (não é necessário considerar o registo online dos clientes)
+- [ x ] Mecanismo para controlo de acesso, que permita indicar explicitamente se um utente pode ou não transferir ficheiros
+- [ x ] Protocolo (planeamento e descrição) para a autenticação de utentes através do cartão de cidadão
+- [ x ] Protocolo (planeamento e descrição) para a autenticação do servidor utilizando certificados X.509
 
 ### Implementation:
-- [  ] Protocolo para autenticação de utentes através da apresentação de senhas
-- [  ] Mecanismo para controlo de acesso
+- [ x ] Protocolo para autenticação de utentes através da apresentação de senhas
+- [ x ] Mecanismo para controlo de acesso
 - [  ] Protocolo para autenticação de utentes através do cartão de cidadão
 - [  ] Protocolo para autenticação do servidor através de certificados X.509
 
 ### Bonus Points:
-- [  ] Outros mecanismos que confiram maior segurança ao sistema (Opcional)
+- [  ] Outros mecanismos que confiram maior segurança ao sistema (Opcional)  
+    - [  ] Hash( Hash (Salt + Password) + Nonce ) -> Secure senha
 
 ## Report:
 O relatório deverá descrever o protocolo e demonstrar o funcionamento de cada uma das 4 funcionalidade + capturas de ecrã  
