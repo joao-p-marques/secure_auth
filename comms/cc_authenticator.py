@@ -26,28 +26,31 @@ class CC_authenticator():
         self.session = self.pkcs11.openSession(slot)
 
         self._private_key = None
-        self.fetch_pk()
 
-        self.attr = None
+        self.attr_list = {}
         self.get_attr_list()
+
+        self.fetch_pk()
 
         self.cert = None
 
     def get_attr_list(self):
         for obj in self.session.findObjects():
             # Get object attributes
-            self.attr = self.session.getAttributeValue(obj, self.all_attr)
+            attr = self.session.getAttributeValue(obj, self.all_attr)
 
             # Create dictionary with attributes
-            self.attr = dict(zip(map(PyKCS11.CKA.get, self.all_attr), self.attr))
+            attr = dict(zip(map(PyKCS11.CKA.get, self.all_attr), attr))
 
-            print('Label:', self.attr['CKA_LABEL'])
+            print('Label:', attr['CKA_LABEL'])
+            self.attr_list[attr['CKA_LABEL'].decode()] = attr
 
     def fetch_pk(self):
-        self._private_key = self.session.findObjects([
-                (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
-                (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION KEY')]
-            )[0]
+        # self._private_key = self.session.findObjects([
+        #         (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
+        #         (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION KEY')]
+        #     )[0]
+        self._private_key = self.attr_list['CITIZEN AUTHENTICATION KEY']['CKA_VALUE']
 
     def private_key(self):
         return self._private_key
@@ -61,12 +64,8 @@ class CC_authenticator():
         return signature
 
     def get_certificate(self):
-        # cert = session.findObjects([
-        #             (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
-        #             (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION CERTIFICATE')]
-        #             )[0]
         if not self.cert:
-            self.cert = x509.load_der_x509_certificate(bytes(self.attr['CKA_VALUE']), default_backend())
+            self.cert = x509.load_der_x509_certificate(bytes(self.attr_list['CITIZEN AUTHENTICATION CERTIFICATE']['CKA_VALUE']), default_backend())
         return self.cert
         # return self.cert.public_bytes(
         #     encoding=serialization.Encoding.PEM
