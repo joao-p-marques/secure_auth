@@ -66,7 +66,7 @@ class CC_authenticator():
         #             (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION CERTIFICATE')]
         #             )[0]
         if not self.cert:
-            self.cert = x509.load_der_x509_certificate(bytes(self.attr['CKA_VALUE']), default_backend())
+            self.cert = x509.load_der_x509_certificate(bytes(self.attr['CITIZEN AUTHENTICATION CERTIFICATE']), default_backend())
         return self.cert
         # return self.cert.public_bytes(
         #     encoding=serialization.Encoding.PEM

@@ -124,9 +124,12 @@ class Certificate_Validator():
         except:
             print('No Delta CRLs found.')
 
+        self.load_crls(self.crls_path)
 
     def validate_certificate(self, cert):
+        self.crls = []
         self.load_crls_cert(cert)
+
         chain = self.build_chain([], cert)
         is_valid = self.validate_chain(chain)
 
