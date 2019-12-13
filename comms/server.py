@@ -45,14 +45,15 @@ class ClientHandler(asyncio.Protocol):
         #Auth
         with open('userdb','rb') as f:
             file = f.read().decode()
-        f.close()
+
         lines = re.split('\n',file)
         self.elems = [re.split(':',line) for line in lines]
-        self.users = [elem[0] for elem in self.elems]
-        self.cc_users = [elem[1] for elem in self.elems]
         self.user_data = {}
+        self.user_cc = {}
         for elem in self.elems:
             self.user_data[elem[0]] = elem[1:]
+        for elem in self.elems:
+            self.user_cc[elem[1]] = elem[0:1] + elem[2:]
 
         self.parameters = None
         self.private_key = None
@@ -60,7 +61,7 @@ class ClientHandler(asyncio.Protocol):
         #server cert
         with open('server/ServerPrat.crt','rb') as f:
             pem_data = f.read()
-        f.close()
+
         cert = x509.load_pem_x509_certificate(pem_data, default_backend())
         cert = cert.public_bytes(Encoding.PEM)
         self.certificate = str(cert)
@@ -68,7 +69,6 @@ class ClientHandler(asyncio.Protocol):
         #Starting publ and priv keys for session
         with open('server/ServerPrat_Key.pem','rb') as f:
             pem_data = f.read()
-        f.close()
 
         self.priv_key = load_pem_private_key(pem_data, password=None, backend=default_backend())
         self.publ_key = self.priv_key.public_key()
@@ -348,12 +348,12 @@ class ClientHandler(asyncio.Protocol):
         logger.debug("Process Authentication for user: {}".format(user))
         #do the same for process
         if cc_flag:
-            if user in self.cc_users and self.user_data[user][2]=="AUTH_WRITE":
+            if user in self.user_cc.keys() and self.user_data[user][2]=="AUTH_WRITE":
                 logger.info("User %s can write files" % (user))
                 return True
             logger.info("User %s cant write files" % (user))
         else:
-            if user in self.users and self.user_data[user][2]=="AUTH_WRITE":
+            if user in self.user_data.keys() and self.user_data[user][2]=="AUTH_WRITE":
                 logger.info("User %s can write files" % (user))
                 return True
             logger.info("User %s cant write files" % (user))
