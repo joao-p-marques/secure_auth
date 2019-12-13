@@ -49,6 +49,10 @@ class ClientProtocol(asyncio.Protocol):
         self.buffer = ''  # Buffer to receive data chunks
 
         self.key = None
+        self.con_done = False
+        
+        # Current challenge
+        self.challenge = None
 
         #Data important
         self.server_cert = None
@@ -85,6 +89,7 @@ class ClientProtocol(asyncio.Protocol):
         self.negotiate_algos()
 
     def start_connection(self):
+        self.con_done = True
         message = {'type': 'HELLO'}
         self._send(message)
 
@@ -92,14 +97,17 @@ class ClientProtocol(asyncio.Protocol):
         #validate chain here
         # print(pem_data)
         self.server_cert = x509.load_pem_x509_certificate(pem_data, default_backend())
-        print(self.server_cert.issuer)
         valid = self.validator.validate_certificate(self.server_cert)
+        self.challenge = self.create_challenge()
         if valid:
-            msg = self.decide_cert_pass()
+            msg = {'type':'CHALLENGE','NONCE':self.challenge}
             self._send(msg)
             return True
         else:
+            #mensagem de erro a dizer que nao e valido
+            logger.info("Certificado não valido")
             return False
+
 
     def decide_cert_pass(self):
         opt = input("\nQual metodo pretende usar? \n(1) - CC\n(2) - Senha\n>> ")
@@ -107,10 +115,8 @@ class ClientProtocol(asyncio.Protocol):
             opt = input("\nQual metodo pretende usar? \n(1) - CC\n(2) - Senha\n>> ")
 
         if opt == "1":
-            logger.info("Going for CC")
             msg = self.authenticate_cc()
         elif opt == "2":
-            logger.info("Going for senha")
             msg = self.authenticate_user()
         
         return msg
@@ -118,18 +124,20 @@ class ClientProtocol(asyncio.Protocol):
     def authenticate_user(self):
         self.username = input("User: ")
         self.password = getpass.getpass()
-        challenge = uuid.uuid1().hex
+        self.challenge = self.create_challenge()
         self.priv_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=2048,
             backend=default_backend()
         )
         self.publ_key = self.priv_key.public_key()
-        message = {'type': 'LOGIN', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE':self.sign_private(challenge)}
+        message = {'type': 'LOGIN', 'login_type':'USER' , 'USERNAME':self.username, 'NONCE':self.sign_private(self.challenge)}
         #self.hashed_pw = hash(self.password)
         logger.info(message)
         self._send(message)
 
+    def create_challenge(self):
+        return uuid.uuid4().hex
 
     def authenticate_cc(self):
         if not self.cc_authenticator:
@@ -140,7 +148,7 @@ class ClientProtocol(asyncio.Protocol):
         #o username vai ser o codigo do cc, tem que estar na bd
         #joao pega aqui
         #talvez fazermos mais um campo na bd que assume
-        challenge = uuid.uuid1().hex
+        self.challenge = self.create_challenge()
         #fazer algo semalhante para ter as chaves do CC
         self.priv_key = self.cc_authenticator.private_key()
         self.publ_key = cc_cert.public_key()
@@ -150,23 +158,29 @@ class ClientProtocol(asyncio.Protocol):
                 'login_type':'CC', 
                 'USERNAME': cc_cert.subject.rfc4514_string(), 
                 'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(), 
-                'NONCE':challenge
+                'NONCE':self.challenge
                 }
         logger.info(message)
         self._send(message)
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
-        # signature = self.priv_key.sign(
-        #     message,
-        #     padding.PSS(
-        #         mgf=padding.MGF1(hashes.SHA256()),
-        #         salt_length=padding.PSS.MAX_LENGTH
-        #     ),
-        #     hash_using
-        # )
-        # logger.info("Signing with private: %s" % (signature))
-        # return signature.public_bytes(Encoding.PEM)
-        return ''
+        signature = self.priv_key.sign(
+            message.encode(),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hash_using
+        )
+        logger.info("Signing with private: %s" % (signature))
+        return signature
+
+    def process_answer(self,message):
+        ret = self.validate_challenge(message.get('ANSWER',''))
+        if ret:
+            
+        else:
+            self.transport.close()
 
     def negotiate_algos(self):
         #Escolha random de um dos 
@@ -237,7 +251,6 @@ class ClientProtocol(asyncio.Protocol):
             return
 
         mtype = message.get('type', None)
-        logger.info(message)
 
         if mtype == 'MIC':
             mic = base64.b64decode(message.get('mic'))
@@ -247,7 +260,6 @@ class ClientProtocol(asyncio.Protocol):
                 # logger.debug('MIC Accepted')
                 message = msg
                 mtype = msg.get('type')
-                return
             else:
                 logger.debug('MIC Wrong. Message compromissed')
                 return
@@ -260,7 +272,6 @@ class ClientProtocol(asyncio.Protocol):
             message = self.sym_decrypt(e_data, iv)
             message = json.loads(message.decode())
             mtype = message.get('type', None)
-            return
 
         logger.debug(f"Received (decrypted): {message}")
 
@@ -274,6 +285,10 @@ class ClientProtocol(asyncio.Protocol):
             ret = self.validate_cert(base64.b64decode(message.get('cert')))
             return True if ret else self.transport.close()
 
+        elif mtype == 'CHALLENGE_ANSWER':
+            self.process_answer(message)
+            return
+
         elif mtype == 'DH_KEY_EXCHANGE':
             pub_key = message.get('data').get('pub_key')
             self.get_key(pub_key)
@@ -282,17 +297,16 @@ class ClientProtocol(asyncio.Protocol):
         elif mtype == 'OK':  # Server replied OK. We can advance the state
             if self.state == STATE_OPEN:
                 logger.info("Channel open")
-                self.send_file(self.file_name)
+                if not self.con_done:
+                    self.start_connection()
             elif self.state == STATE_DATA:  # Got an OK during a message transfer.
-                # Reserved for future use
+                self.send_file(self.file_name)
                 pass
             else:
                 logger.warning("Ignoring message from server")
             return
         elif mtype == 'CIPHER_CHOSEN':
             self.finalize_algorithm(message)
-            #Processo de escolha foi feito e agora vamos transferir o file
-            self.start_connection()
             self.open_connection()
             return
         elif mtype == 'ERROR':
