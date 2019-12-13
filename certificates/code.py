@@ -8,6 +8,7 @@ import datetime
 
 roots = {}
 intermediate_certs = {}
+crls = []
 
 def load_certificate(file_name): 
     now = datetime.datetime.now()
@@ -29,7 +30,12 @@ def load_certificate(file_name):
     else:
         return cert, True
 
-    # return cert, True
+def load_crl(file_name):
+    with open(file_name, 'rb') as f:
+        crl_data = f.read()
+        # crl = x509.load_pem_x509_crl(crl_data, default_backend())
+        crl = x509.load_der_x509_crl(crl_data, default_backend())
+    return crl
 
 def build_chain(chain, cert):
     chain.append(cert)
@@ -47,21 +53,28 @@ def build_chain(chain, cert):
         print('found issuer')
         return build_chain(chain, intermediate_certs[issuer])
 
-def validate_chain(chain):
+def validate_chain(chain, crls):
     if len(chain) == 1:
         return True
 
     cert = chain[0]
     issuer = chain[1]
 
-    issuer.public_key().verify(
-        cert.signature,
-        cert.tbs_certificate_bytes,
-        padding.PKCS1v15(),
-        cert.signature_hash_algorithm,
-    )
+    try:
+        issuer.public_key().verify(
+            cert.signature,
+            cert.tbs_certificate_bytes,
+            padding.PKCS1v15(),
+            cert.signature_hash_algorithm,
+        )
+    except cryptography.exceptions.InvalidSignature:
+        return False
 
-    return validate_chain(chain[1:])
+    for crl in crls:
+        if crl.get_revoked_certificate_by_serial_number(cert.serial_number) is not None:
+            return False
+
+    return validate_chain(chain[1:], crls)
 
 def load_certificates(dir_name, roots, intermediate_certs):
     for entry in scandir(dir_name):
@@ -76,14 +89,22 @@ def load_certificates(dir_name, roots, intermediate_certs):
         else:
             intermediate_certs[c.subject.rfc4514_string()] = c
 
+def load_crls(dir_name, crls):
+    for entry in scandir(dir_name):
+        if entry.is_dir() or not (any(x in entry.name for x in ['crl'])):
+            continue
+        crl = load_crl(entry)
+        crls.append(crl)
 
 load_certificates('/etc/ssl/certs', roots, intermediate_certs)
 load_certificates('certs/', roots, intermediate_certs)
+load_certificates('certs/PTEID/', roots, intermediate_certs)
+load_crls('certs/crls', crls)
 
-c, valid = load_certificate('certs/gitlab.pem')
+c, valid = load_certificate('certs/cc_cert.pem')
 
 cert_chain = build_chain([], c)
 print(cert_chain)
 
-chain_valid = validate_chain(cert_chain)
+chain_valid = validate_chain(cert_chain, crls)
 print(chain_valid)
