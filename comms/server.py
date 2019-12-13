@@ -148,7 +148,6 @@ class ClientHandler(asyncio.Protocol):
             return
 
         mtype = message.get('type', "").upper()
-        logger.info(message)
 
         if mtype == 'MIC':
             mic = base64.b64decode(message.get('mic'))
@@ -170,7 +169,7 @@ class ClientHandler(asyncio.Protocol):
             message = json.loads(message.decode())
             mtype = message.get('type', None)
 
-        logger.info(f"Received (decrypted): {message}")
+        logger.debug(f"Received (decrypted): {message}")
 
         if mtype == 'DH_KEY_EXCHANGE':
             ret = self.get_key(message.get('data').get('pub_key'))
@@ -194,7 +193,6 @@ class ClientHandler(asyncio.Protocol):
             if not self.private_key:
                 self.diffie_hellman_gen_Y()
         elif mtype == 'HELLO':
-            logger.debug('ola')
             ret = self.process_hello()
         elif mtype == 'LOGIN':
             ret = self.process_login(message)
@@ -509,9 +507,6 @@ class ClientHandler(asyncio.Protocol):
             ):
                 logger.warning("Negotiation impossible, ciphers or modes not allowed or inexistent.")
                 return False
-
-        #Aqui fazer uma escolha hardcoded por ordem de melhor para pior cifra a usar
-        logger.info("Cipher chosen from message: %s" % (message))
 
         ret = self.choose_algo(message.get('ciphers'), 
                 message.get('modes'),

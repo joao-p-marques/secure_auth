@@ -49,6 +49,7 @@ class ClientProtocol(asyncio.Protocol):
         self.buffer = ''  # Buffer to receive data chunks
 
         self.key = None
+        self.con_done = False
 
         #Data important
         self.server_cert = None
@@ -85,6 +86,7 @@ class ClientProtocol(asyncio.Protocol):
         self.negotiate_algos()
 
     def start_connection(self):
+        self.con_done = True
         message = {'type': 'HELLO'}
         self._send(message)
 
@@ -92,13 +94,15 @@ class ClientProtocol(asyncio.Protocol):
         #validate chain here
         # print(pem_data)
         self.server_cert = x509.load_pem_x509_certificate(pem_data, default_backend())
-        print(self.server_cert.issuer)
         valid = self.validator.validate_certificate(self.server_cert)
         if valid:
+            logger.info("Certificado valido")
             msg = self.decide_cert_pass()
             self._send(msg)
             return True
         else:
+            #mensagem de erro a dizer que nao e valido
+            logger.info("Certificado não valido")
             return False
 
     def decide_cert_pass(self):
@@ -107,10 +111,8 @@ class ClientProtocol(asyncio.Protocol):
             opt = input("\nQual metodo pretende usar? \n(1) - CC\n(2) - Senha\n>> ")
 
         if opt == "1":
-            logger.info("Going for CC")
             msg = self.authenticate_cc()
         elif opt == "2":
-            logger.info("Going for senha")
             msg = self.authenticate_user()
         
         return msg
@@ -237,7 +239,6 @@ class ClientProtocol(asyncio.Protocol):
             return
 
         mtype = message.get('type', None)
-        logger.info(message)
 
         if mtype == 'MIC':
             mic = base64.b64decode(message.get('mic'))
@@ -247,7 +248,6 @@ class ClientProtocol(asyncio.Protocol):
                 # logger.debug('MIC Accepted')
                 message = msg
                 mtype = msg.get('type')
-                return
             else:
                 logger.debug('MIC Wrong. Message compromissed')
                 return
@@ -260,7 +260,6 @@ class ClientProtocol(asyncio.Protocol):
             message = self.sym_decrypt(e_data, iv)
             message = json.loads(message.decode())
             mtype = message.get('type', None)
-            return
 
         logger.debug(f"Received (decrypted): {message}")
 
@@ -272,6 +271,7 @@ class ClientProtocol(asyncio.Protocol):
             return
         elif mtype == 'CERT':
             ret = self.validate_cert(base64.b64decode(message.get('cert')))
+            logger.info("Validated cert: %s" % (ret))
             return True if ret else self.transport.close()
 
         elif mtype == 'DH_KEY_EXCHANGE':
@@ -282,17 +282,16 @@ class ClientProtocol(asyncio.Protocol):
         elif mtype == 'OK':  # Server replied OK. We can advance the state
             if self.state == STATE_OPEN:
                 logger.info("Channel open")
-                self.send_file(self.file_name)
+                if not self.con_done:
+                    self.start_connection()
             elif self.state == STATE_DATA:  # Got an OK during a message transfer.
-                # Reserved for future use
+                self.send_file(self.file_name)
                 pass
             else:
                 logger.warning("Ignoring message from server")
             return
         elif mtype == 'CIPHER_CHOSEN':
             self.finalize_algorithm(message)
-            #Processo de escolha foi feito e agora vamos transferir o file
-            self.start_connection()
             self.open_connection()
             return
         elif mtype == 'ERROR':

@@ -16,13 +16,10 @@ class Certificate_Validator():
 
         for d in trusted_cert_list:
             self.load_certificates(d, trusted=True)
-            print(f'Loaded {d}')
         for d in cert_list:
             self.load_certificates(d)
-            print(f'Loaded {d}')
         for d in crl_list:
             self.load_crls(d)
-            print(f'Loaded {d}')
 
     def load_certificate(self, file_name): 
         now = datetime.datetime.now()
@@ -58,13 +55,11 @@ class Certificate_Validator():
         subject = cert.subject.rfc4514_string()
 
         if issuer == subject and subject in self.roots:
-            print("Chain completed")
             return chain
 
         if issuer in self.roots:
             return self.build_chain(chain, self.roots[issuer])
         elif issuer in self.intermediate_certs:
-            print('found issuer')
             return self.build_chain(chain, self.intermediate_certs[issuer])
 
     def validate_chain(self, chain):
@@ -96,9 +91,7 @@ class Certificate_Validator():
                 continue
             c, valid = self.load_certificate(entry)
             if not valid:
-                print(c, 'not valid')
                 continue
-            print('Loaded', entry.name, '(', c.subject.rfc4514_string(), ')')
             if trusted:
                 self.roots[c.subject.rfc4514_string()] = c
             else:
@@ -113,7 +106,6 @@ class Certificate_Validator():
 
     def validate_certificate(self, cert):
         chain = self.build_chain([], cert)
-        print(chain)
         is_valid = self.validate_chain(chain)
 
         return is_valid
