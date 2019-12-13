@@ -313,7 +313,10 @@ class ClientHandler(asyncio.Protocol):
         msg = ''
         if message.get('login_type', "").upper() == "CC":
             # validar certificado do user
-            if not self.validator.validate_certificate(message.get('USER_CERT')):
+            client_cert_pem = base64.b64decode(message.get('USER_CERT'))
+            client_cert = x509.load_pem_x509_certificate(client_cert_pem, default_backend())
+
+            if not self.validator.validate_certificate(client_cert):
                 return False
 
             if self.check_user(username, True):
