@@ -46,11 +46,12 @@ class CC_authenticator():
             self.attr_list[attr['CKA_LABEL'].decode()] = attr
 
     def fetch_pk(self):
-        # self._private_key = self.session.findObjects([
-        #         (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
-        #         (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION KEY')]
-        #     )[0]
-        self._private_key = self.attr_list['CITIZEN AUTHENTICATION KEY']['CKA_VALUE']
+        self._private_key = self.session.findObjects([
+                (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
+                (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION KEY')]
+            )[0]
+        # self._private_key = self.attr_list['CITIZEN AUTHENTICATION KEY']['CKA_VALUE']
+        # print(self._private_key)
 
     def private_key(self):
         return self._private_key
@@ -59,7 +60,7 @@ class CC_authenticator():
         mechanism = PyKCS11.Mechanism(PyKCS11.CKM_SHA1_RSA_PKCS, None)
         # text = b'text to sign'
 
-        signature = bytes(session.sign(self._private_key, text, mechanism))
+        signature = bytes(self.session.sign(self._private_key, text, mechanism))
         # print(signature)
         return signature
 

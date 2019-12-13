@@ -354,7 +354,7 @@ class ClientHandler(asyncio.Protocol):
             else:
                 #verificar se a pass esta bem aqui
 
-                if signature != message.get('ANSWER',''):
+                if signature != base64.b64decode(message.get('ANSWER','')):
                     self._send({'type': 'ERROR', 'message': 'Authentication Failed'})
                     return False
                 return True

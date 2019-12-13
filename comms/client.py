@@ -169,7 +169,7 @@ class ClientProtocol(asyncio.Protocol):
                 'login_type':'CC', 
                 'USERNAME': cc_cert.subject.rfc4514_string(), 
                 'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(),
-                'ANSWER': self.sign_private(self.challenge_gotten,True).decode() 
+                'ANSWER': base64.b64encode(self.sign_private(self.challenge_gotten,True)).decode() 
                 }
 
         logger.info(message)
@@ -177,14 +177,15 @@ class ClientProtocol(asyncio.Protocol):
 
     def sign_private(self,message,flag_cc):
         if flag_cc:
-            signature = self.priv_key.sign(
-                message.encode(),
-                padding.PSS(
-                    mgf=padding.MGF1(hashes.SHA256()),
-                    salt_length=padding.PSS.MAX_LENGTH
-                ),
-                hashes.SHA256()
-            )
+            # signature = self.priv_key.sign(
+            #     message.encode(),
+            #     padding.PSS(
+            #         mgf=padding.MGF1(hashes.SHA256()),
+            #         salt_length=padding.PSS.MAX_LENGTH
+            #     ),
+            #     hashes.SHA256()
+            # )
+            signature = self.cc_authenticator.sign_text(message)
         else:
             h = hmac.HMAC(self.hash_pw(self.password), hashes.SHA256(), backend=default_backend())
             h.update(message.encode())
