@@ -152,7 +152,10 @@ class ClientProtocol(asyncio.Protocol):
 
     def authenticate_cc(self):
         if not self.cc_authenticator:
-            self.cc_authenticator = CC_authenticator()
+            try:
+                self.cc_authenticator = CC_authenticator()
+            except:
+                self.decide_cert_pass()
 
         cc_cert = self.cc_authenticator.get_certificate()
 

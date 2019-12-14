@@ -366,7 +366,8 @@ class ClientHandler(asyncio.Protocol):
                 return False
             else:
                 #verificar se a pass esta bem aqui
-                h = hmac.HMAC(self.user_data[username][1], hashes.SHA256(), backend=default_backend())
+                # logger.debug(self.user_data[username][1] + ' -> ' + str(bytes(self.user_data[username][1], 'utf-8')))
+                h = hmac.HMAC(bytes(self.user_data[username][1], 'utf-8'), hashes.SHA256(), backend=default_backend())
                 h.update(self.challenge.encode())
                 signature = h.finalize()
 

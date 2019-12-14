@@ -15,7 +15,6 @@ elems = [re.split(':',line) for line in lines]
 user_pws = [elem[2:3] for elem in elems]    
 print(user_pws)
 
-
 for pw in user_pws:
     print(hash_pw(pw[0]))
 
