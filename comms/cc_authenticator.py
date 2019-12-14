@@ -67,9 +67,12 @@ class CC_authenticator():
     def get_certificate(self):
         if not self.cert:
             self.cert = x509.load_der_x509_certificate(bytes(self.attr_list['CITIZEN AUTHENTICATION CERTIFICATE']['CKA_VALUE']), default_backend())
+        if self.cert.public_bytes(
+            encoding=serialization.Encoding.PEM
+        ) == self._private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM
+        ):
+            print('NOT DIIIIIFFFFFFERRRENRNRN')
         return self.cert
-        # return self.cert.public_bytes(
-        #     encoding=serialization.Encoding.PEM
-        # )
 
 

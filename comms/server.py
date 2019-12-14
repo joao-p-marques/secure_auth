@@ -62,6 +62,9 @@ class ClientHandler(asyncio.Protocol):
         self.parameters = None
         self.private_key = None
 
+        logger.info(self.user_data)
+        logger.info(self.user_cc)
+
         #server cert
         with open('server/ServerPrat.crt','rb') as f:
             pem_data = f.read()
@@ -340,13 +343,15 @@ class ClientHandler(asyncio.Protocol):
             client_cert = x509.load_pem_x509_certificate(client_cert_pem, default_backend())
 
             self.user_key = client_cert.public_key()
+            print(self.user_key)
 
             if not self.validator.validate_certificate(client_cert):
                 self._send({'type': 'ERROR', 'message': 'Certificate not validated'})
                 return False
 
             if self.check_user(username, True):
-                msg = self.validate_challenge('')
+                msg = self.validate_challenge(message.get('ANSWER', ''))
+                # logger.debug('ANSWER CORRECT')
             else:
                 self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
                 return False
@@ -359,12 +364,14 @@ class ClientHandler(asyncio.Protocol):
             else:
                 #verificar se a pass esta bem aqui
                 h = hmac.HMAC(self.hash_pw(self.user_data[username][1]), hashes.SHA256(), backend=default_backend())
-                h.update(message.encode())
+                h.update(self.challenge.encode())
                 signature = h.finalize()
 
                 if signature != base64.b64decode(message.get('ANSWER','')):
-                    self._send({'type': 'ERROR', 'message': 'Authentication Failed'})
+                    self._send({'type': 'ERROR', 'message': 'Authentication Failed (Wrong answer to challenge)'})
                     return False
+                logger.debug('ANSWER CORRECT')
+                self._send({'type': 'OK'})
                 return True
 
         else:
@@ -374,8 +381,8 @@ class ClientHandler(asyncio.Protocol):
         return True
 
     def sign_private(self,message,hash_using=hashes.SHA256()):
-        if self.priv_key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo) == self.certificate.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo):
-            logger.info("SAO IGUAIS")
+        # if self.priv_key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo) == self.certificate.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo):
+        #     logger.info("SAO IGUAIS")
         signature = self.priv_key.sign(
             message.encode(),
             padding.PSS(
@@ -392,16 +399,16 @@ class ClientHandler(asyncio.Protocol):
         try:
             if self.user_key is not None:
                 self.user_key.verify(
-                    challenge_gotten.encode(),
-                    self.challenge,
+                    base64.b64decode(challenge_gotten),
+                    self.challenge.encode(),
                     padding.PSS(
                         mgf=padding.MGF1(hashes.SHA256()),
                         salt_length=padding.PSS.MAX_LENGTH
                     ),
                     hashes.SHA256()
                 )
-            else:
-                self.password_solve()
+            # else:
+            #     self.password_solve()
             return True
         except cryptography.exceptions.InvalidSignature:
             logger.info("Challenge was not answered correctly")
@@ -411,7 +418,7 @@ class ClientHandler(asyncio.Protocol):
         logger.debug("Process Authentication for user: {}".format(user))
         #do the same for process
         if cc_flag:
-            if user in self.user_cc.keys() and self.user_data[user][2]=="AUTH_WRITE":
+            if user in self.user_cc.keys() and self.user_cc[user][2]=="AUTH_WRITE":
                 logger.info("User %s can write files" % (user))
                 return True
             logger.info("User %s cant write files" % (user))

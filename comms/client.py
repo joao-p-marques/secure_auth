@@ -139,11 +139,12 @@ class ClientProtocol(asyncio.Protocol):
                 'type': 'LOGIN', 
                 'login_type':'USER', 
                 'USERNAME': self.username, 
-                'ANSWER': self.sign_private(self.challenge_gotten,False) 
+                'ANSWER': base64.b64encode(self.sign_private(self.challenge_gotten,False)).decode() 
                 }
         #self.hashed_pw = hash(self.password)
         logger.info(message)
-        self._send(message)
+        # self._send(message)
+        return message
 
     def create_challenge(self):
         return uuid.uuid4().hex
@@ -167,13 +168,14 @@ class ClientProtocol(asyncio.Protocol):
         message = {
                 'type': 'LOGIN', 
                 'login_type':'CC', 
-                'USERNAME': cc_cert.subject.rfc4514_string(), 
+                'USERNAME': cc_num, 
                 'USER_CERT': base64.b64encode(cc_cert.public_bytes(Encoding.PEM)).decode(),
                 'ANSWER': base64.b64encode(self.sign_private(self.challenge_gotten,True)).decode() 
                 }
 
         logger.info(message)
-        self._send(message)
+        # self._send(message)
+        return message
 
     def sign_private(self,message,flag_cc):
         if flag_cc:
@@ -185,7 +187,7 @@ class ClientProtocol(asyncio.Protocol):
             #     ),
             #     hashes.SHA256()
             # )
-            signature = self.cc_authenticator.sign_text(message)
+            signature = self.cc_authenticator.sign_text(message.encode())
         else:
             h = hmac.HMAC(self.hash_pw(self.password), hashes.SHA256(), backend=default_backend())
             h.update(message.encode())
@@ -200,8 +202,9 @@ class ClientProtocol(asyncio.Protocol):
         return h.finalize()
 
     def process_answer(self,message):
-        self.challenge_gotten = base64.b64decode(message.get('ANSWER',''))
-        ret = self.validate_challenge(self.challenge_gotten)
+        self.challenge_answer = message.get('ANSWER','')
+        ret = self.validate_challenge(self.challenge_answer)
+        self.challenge_gotten = message.get('NONCE', '')
         if ret:
             #validou por isso vai responder tambem ao challenge com a hash da sua pass
             msg = self.decide_cert_pass()
@@ -212,12 +215,12 @@ class ClientProtocol(asyncio.Protocol):
             self.transport.close()
             return False
 
-    def validate_challenge(self,challenge_gotten):  
+    def validate_challenge(self,challenge_answer):  
         #Desencriptar o challenge com a publica do outro e ser for == self.challenge ta top
         try:
             logger.debug(self.server_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
             self.server_key.verify(
-                self.challenge_gotten,
+                base64.b64decode(self.challenge_answer),
                 self.challenge.encode(),
                 padding.PSS(
                     mgf=padding.MGF1(hashes.SHA256()),
