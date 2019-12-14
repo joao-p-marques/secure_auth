@@ -343,6 +343,7 @@ class ClientHandler(asyncio.Protocol):
             client_cert = x509.load_pem_x509_certificate(client_cert_pem, default_backend())
 
             self.user_key = client_cert.public_key()
+            print(self.user_key)
 
             if not self.validator.validate_certificate(client_cert):
                 self._send({'type': 'ERROR', 'message': 'Certificate not validated'})
@@ -359,15 +360,12 @@ class ClientHandler(asyncio.Protocol):
             # get the keys from the CC and sign it
 
         elif type_login == "USER":
-            auth_2fa = message.get('2FA','')
-            #confirmar se este 2FA funciona
-            if username not in self.user_data or auth_2fa!=self.user_data[username][3]:
+            if username not in self.user_data:
                 self._send({'type': 'ERROR', 'message': 'Access Denied'})
                 return False
             else:
                 #verificar se a pass esta bem aqui
-                # logger.debug(self.user_data[username][1] + ' -> ' + str(bytes(self.user_data[username][1], 'utf-8')))
-                h = hmac.HMAC(bytes(self.user_data[username][1], 'utf-8'), hashes.SHA256(), backend=default_backend())
+                h = hmac.HMAC(self.hash_pw(self.user_data[username][1]), hashes.SHA256(), backend=default_backend())
                 h.update(self.challenge.encode())
                 signature = h.finalize()
 
