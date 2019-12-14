@@ -62,9 +62,6 @@ class ClientHandler(asyncio.Protocol):
         self.parameters = None
         self.private_key = None
 
-        logger.info(self.user_data)
-        logger.info(self.user_cc)
-
         #server cert
         with open('server/ServerPrat.crt','rb') as f:
             pem_data = f.read()
@@ -360,10 +357,13 @@ class ClientHandler(asyncio.Protocol):
             # get the keys from the CC and sign it
 
         elif type_login == "USER":
-            if username not in self.user_data:
+            auth_2fa = message.get('2FA','')
+            print("Gotten 2FA: ",auth_2fa)
+            if username not in self.user_data or auth_2fa!=self.user_data[username][3]:
                 self._send({'type': 'ERROR', 'message': 'Access Denied'})
                 return False
             else:
+                print("I got in")
                 #verificar se a pass esta bem aqui
                 h = hmac.HMAC(self.hash_pw(self.user_data[username][1]), hashes.SHA256(), backend=default_backend())
                 h.update(self.challenge.encode())

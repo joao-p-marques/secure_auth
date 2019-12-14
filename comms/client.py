@@ -133,12 +133,14 @@ class ClientProtocol(asyncio.Protocol):
     def authenticate_user(self):
         self.username = input("User: ")
         self.password = getpass.getpass()
+        auth_2fa = input("Nome do primeiro animal de estimação?\n>> ") 
         self.challenge = self.create_challenge()
         #we are gonna hash that later
         message = {
                 'type': 'LOGIN', 
                 'login_type':'USER', 
-                'USERNAME': self.username, 
+                'USERNAME': self.username,
+                '2FA':auth_2fa,  
                 'ANSWER': base64.b64encode(self.sign_private(self.challenge_gotten,False)).decode() 
                 }
         #self.hashed_pw = hash(self.password)
@@ -364,7 +366,7 @@ class ClientProtocol(asyncio.Protocol):
             self.open_connection()
             return
         elif mtype == 'ERROR':
-            logger.warning("Got error from server: {}".format(message.get('data', None)))
+            logger.warning("Got error from server: {}".format(message.get('message', None)))
             return
         else:
             logger.warning("Invalid message type")
