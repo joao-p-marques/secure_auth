@@ -3,7 +3,9 @@ import binascii
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, PublicFormat, load_pem_public_key,load_pem_private_key
+from cryptography.hazmat.primitives.asymmetric import padding
 
 lib ='/usr/local/lib/libpteidpkcs11.so'
 
@@ -26,11 +28,11 @@ class CC_authenticator():
         self.session = self.pkcs11.openSession(slot)
 
         self._private_key = None
+        self.fetch_pk()
 
         self.attr_list = {}
         self.get_attr_list()
 
-        self.fetch_pk()
 
         self.cert = None
 
@@ -43,9 +45,13 @@ class CC_authenticator():
             attr = dict(zip(map(PyKCS11.CKA.get, self.all_attr), attr))
 
             print('Label:', attr['CKA_LABEL'])
+            if attr['CKA_LABEL'].decode() == 'CITIZEN AUTHENTICATION CERTIFICATE':
+                print('EEEEEIIIIIIII')
             self.attr_list[attr['CKA_LABEL'].decode()] = attr
 
     def fetch_pk(self):
+        # print(self.attr_list['CITIZEN AUTHENTICATION KEY'])
+        # print(load_pem_private_key(bytes(self.attr_list['CITIZEN AUTHENTICATION KEY']), password=None, backend=default_backend()))
         self._private_key = self.session.findObjects([
                 (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
                 (PyKCS11.CKA_LABEL,'CITIZEN AUTHENTICATION KEY')]
@@ -61,18 +67,14 @@ class CC_authenticator():
         # text = b'text to sign'
 
         signature = bytes(self.session.sign(self._private_key, text, mechanism))
-        # print(signature)
+        print(signature)
         return signature
 
     def get_certificate(self):
         if not self.cert:
+            # self.cert = x509.load_der_x509_certificate(bytes(self.attr_list['CITIZEN AUTHENTICATION CERTIFICATE']['CKA_VALUE']), default_backend())
             self.cert = x509.load_der_x509_certificate(bytes(self.attr_list['CITIZEN AUTHENTICATION CERTIFICATE']['CKA_VALUE']), default_backend())
-        if self.cert.public_bytes(
-            encoding=serialization.Encoding.PEM
-        ) == self._private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM
-        ):
-            print('NOT DIIIIIFFFFFFERRRENRNRN')
+        # self.cert.public_key().verify(self.sign_text(b'ola'), b'ola', padding.PKCS1v15(),  hashes.SHA1())
         return self.cert
 
 

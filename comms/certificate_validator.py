@@ -4,12 +4,13 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
 
-from os import scandir
+from os import scandir, remove
 import datetime
+import wget
 
 class Certificate_Validator():
 
-    def __init__(self, trusted_cert_list, cert_list, crls_path):
+    def __init__(self, trusted_cert_list, cert_list, crls_path='certs/crls'):
         self.roots = {}
         self.intermediate_certs = {}
         self.crls = []
@@ -82,8 +83,13 @@ class Certificate_Validator():
         except cryptography.exceptions.InvalidSignature:
             return False
 
+        now = datetime.datetime.now()
         for crl in self.crls:
+            if now > crl.next_update:
+                print(cert.subject.rfc4514_string(), 'is outdated')
+                continue
             if crl.get_revoked_certificate_by_serial_number(cert.serial_number) is not None:
+                print(cert.subject.rfc4514_string(), 'has been revoked')
                 return False
 
         return self.validate_chain(chain[1:])
@@ -111,7 +117,7 @@ class Certificate_Validator():
         try:
             for ext in cert.extensions.get_extension_for_class(x509.CRLDistributionPoints).value:
                 for name in ext.full_name:
-                    fname = wget.download(name.value, self.crls_path + name + '.crl')
+                    fname = wget.download(name.value, self.crls_path)
                     print(fname)
         except:
             print('No CRLs found')
@@ -119,14 +125,24 @@ class Certificate_Validator():
         try:
             for ext in cert.extensions.get_extension_for_class(x509.FreshestCRL).value:
                 for name in ext.full_name:
-                    fname = wget.download(name.value, self.crls_path + name + '.crl')
+                    fname = wget.download(name.value, self.crls_path)
                     print(fname)
         except:
             print('No Delta CRLs found.')
 
         self.load_crls(self.crls_path)
+        self.clear_crls_cert()
+
+    def clear_crls_cert(self):
+        import glob
+
+        files = glob.glob(self.crls_path + '*')
+        for f in files:
+            print('Removing', f)
+            remove(f)
 
     def validate_certificate(self, cert):
+        print(f'Validating certificate from {cert.subject.rfc4514_string()}')
         self.crls = []
         self.load_crls_cert(cert)
 
@@ -135,12 +151,3 @@ class Certificate_Validator():
 
         return is_valid
 
-
-
-# c, valid = load_certificate('certs/user_certs/cc_cert.pem')
-
-# cert_chain = build_chain([], c)
-# print(cert_chain)
-
-# chain_valid = validate_chain(cert_chain, crls)
-# print(chain_valid)

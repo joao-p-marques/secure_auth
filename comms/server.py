@@ -88,7 +88,7 @@ class ClientHandler(asyncio.Protocol):
         self.mode = None
         self.hash_function = None
 
-        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/server/PTEID/'], 'certs/server/crls')
+        self.validator = Certificate_Validator(['/etc/ssl/certs/'], ['certs/server/PTEID/'], 'certs/server/crls/')
         self.user_key = None
 
     def connection_made(self, transport) -> None:
@@ -350,8 +350,10 @@ class ClientHandler(asyncio.Protocol):
                 return False
 
             if self.check_user(username, True):
-                msg = self.validate_challenge(message.get('ANSWER', ''))
-                # logger.debug('ANSWER CORRECT')
+                if self.validate_challenge(message.get('ANSWER', '')):
+                    self._send({'type': 'OK'})
+                    logger.debug('ANSWER CORRECT')
+                self._send({'type': 'ERROR', 'message': 'Authentication Denied'})
             else:
                 self._send({'type': 'ERROR', 'message': 'Authorization Denied'})
                 return False
@@ -401,17 +403,14 @@ class ClientHandler(asyncio.Protocol):
                 self.user_key.verify(
                     base64.b64decode(challenge_gotten),
                     self.challenge.encode(),
-                    padding.PSS(
-                        mgf=padding.MGF1(hashes.SHA256()),
-                        salt_length=padding.PSS.MAX_LENGTH
-                    ),
-                    hashes.SHA256()
+                    padding.PKCS1v15(),
+                    hashes.SHA1()
                 )
             # else:
             #     self.password_solve()
             return True
         except cryptography.exceptions.InvalidSignature:
-            logger.info("Challenge was not answered correctly")
+            logger.info("Challenge was not answered correctly CC")
             return False
 
     def check_user(self, user,cc_flag):
@@ -652,8 +651,8 @@ class ClientHandler(asyncio.Protocol):
             if missing_bytes == 0:
                 missing_bytes = 16
             # print("Padding size:", missing_bytes)
-            padding = bytes([missing_bytes] * missing_bytes)
-            text += padding
+            padding_msg = bytes([missing_bytes] * missing_bytes)
+            text += padding_msg
 
             cipher = Cipher(algorithm, mode, backend=default_backend())
 

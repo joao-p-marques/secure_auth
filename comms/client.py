@@ -74,7 +74,7 @@ class ClientProtocol(asyncio.Protocol):
 
         self.cc_authenticator = None
 
-        self.validator = Certificate_Validator(['/etc/ssl/certs/', 'certs/client/server_certs'], [], 'certs/client/crls')
+        self.validator = Certificate_Validator(['/etc/ssl/certs/', 'certs/client/server_certs/'], [], 'certs/client/crls/')
 
         print('done')
 
