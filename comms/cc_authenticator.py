@@ -16,23 +16,26 @@ class CC_authenticator():
         self.pkcs11 = PyKCS11.PyKCS11Lib()
         self.pkcs11.load(lib)
 
-        self.slots = self.pkcs11.getSlotList()
+        try:
+            self.slots = self.pkcs11.getSlotList()
 
-        for slot in self.slots:
-            print(self.pkcs11.getTokenInfo(slot))
+            for slot in self.slots:
+                print(self.pkcs11.getTokenInfo(slot))
 
-        self.all_attr = list(PyKCS11.CKA.keys())
+            self.all_attr = list(PyKCS11.CKA.keys())
 
-        #Filter attributes
-        self.all_attr = [e for e in self.all_attr if isinstance(e, int)]
-        self.session = self.pkcs11.openSession(slot)
+            #Filter attributes
+            self.all_attr = [e for e in self.all_attr if isinstance(e, int)]
+            self.session = self.pkcs11.openSession(slot)
+        except:
+            print('Smart Card Reader not found.')
+            return False
 
         self._private_key = None
         self.fetch_pk()
 
         self.attr_list = {}
         self.get_attr_list()
-
 
         self.cert = None
 
@@ -45,8 +48,8 @@ class CC_authenticator():
             attr = dict(zip(map(PyKCS11.CKA.get, self.all_attr), attr))
 
             print('Label:', attr['CKA_LABEL'])
-            if attr['CKA_LABEL'].decode() == 'CITIZEN AUTHENTICATION CERTIFICATE':
-                print('EEEEEIIIIIIII')
+            # if attr['CKA_LABEL'].decode() == 'CITIZEN AUTHENTICATION CERTIFICATE':
+            #     print('EEEEEIIIIIIII')
             self.attr_list[attr['CKA_LABEL'].decode()] = attr
 
     def fetch_pk(self):

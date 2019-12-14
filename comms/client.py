@@ -76,6 +76,7 @@ class ClientProtocol(asyncio.Protocol):
 
         self.validator = Certificate_Validator(['/etc/ssl/certs/', 'certs/client/server_certs/'], [], 'certs/client/crls/')
 
+        print('done')
 
     def connection_made(self, transport) -> None:
         """
@@ -132,14 +133,12 @@ class ClientProtocol(asyncio.Protocol):
     def authenticate_user(self):
         self.username = input("User: ")
         self.password = getpass.getpass()
-        auth_2fa = input("Nome do primeiro animal de estimação?\n>> ")
         self.challenge = self.create_challenge()
         #we are gonna hash that later
         message = {
                 'type': 'LOGIN', 
                 'login_type':'USER', 
                 'USERNAME': self.username, 
-                '2FA':auth_2fa,
                 'ANSWER': base64.b64encode(self.sign_private(self.challenge_gotten,False)).decode() 
                 }
         #self.hashed_pw = hash(self.password)
@@ -152,7 +151,10 @@ class ClientProtocol(asyncio.Protocol):
 
     def authenticate_cc(self):
         if not self.cc_authenticator:
-            self.cc_authenticator = CC_authenticator()
+            try:
+                self.cc_authenticator = CC_authenticator()
+            except:
+                self.decide_cert_pass()
 
         cc_cert = self.cc_authenticator.get_certificate()
 
@@ -164,6 +166,7 @@ class ClientProtocol(asyncio.Protocol):
         self.publ_key = cc_cert.public_key()
 
         cc_num = cc_cert.subject.get_attributes_for_oid(NameOID.SERIAL_NUMBER)[0].value
+        print(cc_num)
 
         message = {
                 'type': 'LOGIN', 
