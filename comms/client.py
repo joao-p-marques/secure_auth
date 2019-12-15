@@ -128,6 +128,8 @@ class ClientProtocol(asyncio.Protocol):
         elif opt == "2":
             msg = self.authenticate_user()
         
+        if msg is None:
+            return self.decide_cert_pass()
         return msg
 
     def authenticate_user(self):
@@ -156,7 +158,7 @@ class ClientProtocol(asyncio.Protocol):
             try:
                 self.cc_authenticator = CC_authenticator()
             except:
-                self.decide_cert_pass()
+                return None
 
         cc_cert = self.cc_authenticator.get_certificate()
 
