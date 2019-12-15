@@ -6,13 +6,18 @@ O utente pode-se autenticar com senhas diretas ou com o cartão de cidadão.
 O servidor deverá conseguir provar a sua identidade, evintando-se ataques de MiTM ou impersonação
 
 ## Prerequisites:
- * `cd comms`
  * `pip install -r requirements.txt --user`
 
 ## How to run:
- * `cd comms`
  * `python3 server.py`
  * `python3 client.py <file_name>`
+
+### Account Information:
+One example to use for password login is:
+ * Username: *tomas*
+ * Password: *123*
+ * Secret Question: *caozitos*
+
 
 ## Main objectives:
 
@@ -29,10 +34,10 @@ O servidor deverá conseguir provar a sua identidade, evintando-se ataques de Mi
 - [ x ] Protocolo para autenticação do servidor através de certificados X.509
 
 ### Bonus Points:
-- [  ] Outros mecanismos que confiram maior segurança ao sistema (Opcional)  
+- [ X ] Outros mecanismos que confiram maior segurança ao sistema (Opcional)  
 
 ## Report:
-O relatório deverá descrever o protocolo e demonstrar o funcionamento de cada uma das 4 funcionalidade + capturas de ecrã  
+O relatório está descrito com o nome de: Relatório Secure_Auth.pdf 
 
 ## Bibliography:
  * [Slides 5 and 6](https://joao.barraca.pt/teaching/sio/2019/)
