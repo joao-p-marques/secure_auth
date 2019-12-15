@@ -5,6 +5,15 @@ Pretende-se que seja possı́vel trocar um ficheiro entre o cliente e o servidor
 O utente pode-se autenticar com senhas diretas ou com o cartão de cidadão.
 O servidor deverá conseguir provar a sua identidade, evintando-se ataques de MiTM ou impersonação
 
+## Prerequisites:
+ * `cd comms`
+ * `pip install -r requirements.txt --user`
+
+## How to run:
+ * `cd comms`
+ * `python3 server.py`
+ * `python3 client.py <file_name>`
+
 ## Main objectives:
 
 ### Architecture:
